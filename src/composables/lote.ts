@@ -93,23 +93,3 @@ export function getLote55(): Array<LoteObject> {
   }
   return result
 }
-
-export function getCombinations(arr: string[], k: number): string[][] {
-  const result: string[][] = []
-
-  function backtrack(start: number, path: string[]) {
-    if (path.length === k) {
-      result.push([...path])
-      return
-    }
-
-    for (let i = start; i < arr.length; i++) {
-      path.push(arr[i])
-      backtrack(i + 1, path)
-      path.pop()
-    }
-  }
-
-  backtrack(0, [])
-  return result
-}
