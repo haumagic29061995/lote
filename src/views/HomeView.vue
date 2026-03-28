@@ -1,45 +1,76 @@
 <script setup lang="ts">
-import { getLote45, getLote55 } from '@/composables/lote.ts'
+import { getLote45, getLote55 } from '@/composables/lote'
 import { LoteObject, type ApearRepeat, type ApearType } from '@/types/lote'
-import { generateOptions, sortNestedArray } from '@/utils'
-import _, { cloneDeep } from 'lodash'
+import { type DropdownType } from '@/types/common'
+import { generateOptions } from '@/utils'
+import _ from 'lodash'
 import { ref } from 'vue'
 import moment from 'moment'
 
-type DropdownType = {
-  text: string
-  value: number
-}
-
-// DATA
 const listData45: Array<LoteObject> = getLote45()
 const listData55: Array<LoteObject> = getLote55()
-const listIndexList: number[][][] = []
+
+const setRepeat45: ApearRepeat[] = []
 const setRepeat55: ApearRepeat[] = []
-for (let i = 1; i <= 55; i++) {
-  const number = i.toString().padStart(2, '0')
-  const appear: ApearRepeat = {
-    number,
-    total: 0,
-    maxRepeat: 0,
+
+generateSetRepeat45()
+function generateSetRepeat45() {
+  for (let i = 1; i <= 45; i++) {
+    const number = i.toString().padStart(2, '0')
+    const appear: ApearRepeat = {
+      number,
+      total: 0,
+      maxRepeat: 0,
+    }
+    setRepeat45.push(appear)
   }
-  setRepeat55.push(appear)
 }
+
+generateSetRepeat55()
+function generateSetRepeat55() {
+  for (let i = 1; i <= 55; i++) {
+    const number = i.toString().padStart(2, '0')
+    const appear: ApearRepeat = {
+      number,
+      total: 0,
+      maxRepeat: 0,
+    }
+    setRepeat55.push(appear)
+  }
+}
+
 const maxLength = listData45.length
 const totalOptions = ref<number[]>([])
-const totalSelected = ref<number>(2)
 totalOptions.value = generateOptions(maxLength)
+
+const totalSelected = ref<number>(7)
 
 const momentDate1 = moment(listData45[0].date, 'DD/MM/YYYY')
 const momentDate2 = moment(listData55[0].date, 'DD/MM/YYYY')
 const predictionLoteType: number = momentDate1 > momentDate2 ? 55 : 45
+console.log('Dự đoán hôm nay: ', predictionLoteType);
 
 const offsetLoteType55: number = predictionLoteType === 55 ? 0 : -1
 const offsetLoteType45: number = predictionLoteType === 45 ? 0 : -1
-const feature_1_filter_two_list_set = new Set<number>()
 
-mainFeature(listData45, offsetLoteType45)
-mainFeature(listData55, offsetLoteType55)
+const setFilterWith2Results = new Set<number>()
+
+const twoListColumn = ref(6)
+
+const isDisplayFeature = ref<boolean>(false)
+
+const hideAppearIs0 = ref<boolean>(false)
+
+const hideNumbersFromDateToIndex = ref<boolean>(false)
+
+const hideDuplicateNumbers = ref<boolean>(false)
+
+const filterWith2Result = ref<string>('')
+
+const filterWithWeek = ref<string>('')
+
+runMainFeature(listData45, offsetLoteType45)
+runMainFeature(listData55, offsetLoteType55)
 
 const listData45Render = ref<Array<LoteObject>>()
 listData45Render.value = listData45
@@ -47,13 +78,8 @@ listData45Render.value = listData45
 const listData55Render = ref<Array<LoteObject>>()
 listData55Render.value = listData55
 
-const feature_1_model = ref<boolean>(false)
-const feature_1_filter = ref<string>('')
-const feature_1_filter_two_list = ref<Array<DropdownType>>([])
-const feature_1_hide_0 = ref<boolean>(false)
-const feature_1_filter_week = ref<string>('')
-
-feature_1_filter_two_list.value = [...feature_1_filter_two_list_set.values()]
+const arrayFilterFor2Result = ref<Array<DropdownType>>([])
+arrayFilterFor2Result.value = [...setFilterWith2Results.values()]
   .sort()
   .map((value) => {
     const result: DropdownType = {
@@ -63,50 +89,28 @@ feature_1_filter_two_list.value = [...feature_1_filter_two_list_set.values()]
     return result
   })
 
-console.log(listData45)
-console.log(listData55)
-console.log(setRepeat55, 'repeat 55')
-console.log(listIndexList, 'index.json')
+console.log('data list 45', listData45)
+console.log('data list 55', listData55)
+console.log('lập lại 45 number', setRepeat45)
+console.log('lập lại 55 number', setRepeat55)
 
-///// Feature 1
-// function feature 1
-function feature_1(
-  listData: Array<LoteObject>,
-  element: LoteObject,
-  element2: LoteObject | undefined,
-  i: number,
-) {
-  const filterList: string[] = element.numberResult.filter((num) =>
-    element2?.numberResult.includes(num),
-  )
-
-  // element
-  element.feature_1_duplicate_numbers_45_55_at_index0 = filterList
-  element.numberResult.forEach((num: string) => {
-    const idx: number = Number(num) + i
-    const elementItem: LoteObject = listData[idx]
-    if (elementItem) {
-      element.feature_1_list_result_45_55_at_index0.push(elementItem.numberResult)
-      elementItem.numberResult.forEach((num2: string) => {
-        element.feature_1_set_numbers_from_result_45_55_at_index0.add(num2)
-        const findItem = element.feature_1_appear_list.find((item) => item.number === num2)
-        if (findItem) {
-          findItem.total++
-        } else {
-          const numberApear: ApearType = {
-            number: num2,
-            total: 1,
-            isResult: element.nextItem?.numberResult.includes(num2) || false,
-            isResult2: element.nextItem?.extraNumber === num2,
-            isDuplicate: element.feature_1_duplicate_numbers_45_55_at_index0.includes(num2),
-          }
-          element.feature_1_appear_list.push(numberApear)
+function handleSetRepeat45(element: LoteObject) {
+  if (element.loteType === 45) {
+    setRepeat45.forEach((item) => {
+      if (element.numberResult.includes(item.number)) {
+        item.total++
+      } else {
+        if (!item.maxRepeat || item.maxRepeat < item.total) {
+          item.maxRepeat = item.total
         }
-      })
-    }
-  })
+        item.total = 0
+      }
+    })
+  }
+}
+
+function handleSetRepeat55(element: LoteObject) {
   if (element.loteType === 55) {
-    // repeat, số lần tối đa lập lại của mỗi số
     setRepeat55.forEach((item) => {
       if (element.numberResult.includes(item.number)) {
         item.total++
@@ -118,8 +122,50 @@ function feature_1(
       }
     })
   }
+}
 
-  // opposite element
+function handleDisplayFeature(
+  listData: Array<LoteObject>,
+  element: LoteObject,
+  element2: LoteObject | undefined,
+  i: number,
+) {
+
+  handleSetRepeat45(element)
+
+  handleSetRepeat55(element)
+
+  const filterList: string[] = element.numberResult.filter((num) =>
+    element2?.numberResult.includes(num),
+  )
+
+  element.duplicateNumbers4555Index0 = filterList
+  element.numbersFromResult4555Index0 = duplicateNumbers(element, i)
+
+  element.numberResult.forEach((num: string) => {
+    const idx: number = Number(num) + i
+    const elementItem: LoteObject = listData[idx]
+    if (elementItem) {
+      element.listResult4555Index0.push(elementItem.numberResult)
+      elementItem.numberResult.forEach((num2: string) => {
+        element.setNumbersFromResult4555Index0.add(num2)
+        const findItem = element.appearListData.find((item) => item.number === num2)
+        if (findItem) {
+          findItem.total++
+        } else {
+          const numberApear: ApearType = {
+            number: num2,
+            total: 1,
+            isResult: element.nextItem?.numberResult.includes(num2) || false,
+            isResult2: element.nextItem?.extraNumber === num2,
+            isDuplicate: element.duplicateNumbers4555Index0.includes(num2),
+          }
+          element.appearListData.push(numberApear)
+        }
+      })
+    }
+  })
+
   if (element2) {
     element2.numberResult
       .filter((num0) => !filterList.includes(num0))
@@ -127,10 +173,10 @@ function feature_1(
         const idx: number = Number(num) + i
         const elementItem: LoteObject = listData[idx]
         if (elementItem) {
-          element.feature_1_list_result_45_55_at_index0.push(elementItem.numberResult)
+          element.listResult4555Index0.push(elementItem.numberResult)
           elementItem.numberResult.forEach((num2: string) => {
-            element.feature_1_set_numbers_from_result_45_55_at_index0.add(num2)
-            const findItem = element.feature_1_appear_list.find((item) => item.number === num2)
+            element.setNumbersFromResult4555Index0.add(num2)
+            const findItem = element.appearListData.find((item) => item.number === num2)
             if (findItem) {
               findItem.total++
             } else {
@@ -139,45 +185,42 @@ function feature_1(
                 total: 1,
                 isResult: element.nextItem?.numberResult.includes(num2) || false,
                 isResult2: element.nextItem?.extraNumber === num2,
-                isDuplicate: element.feature_1_duplicate_numbers_45_55_at_index0.includes(num2),
+                isDuplicate: element.duplicateNumbers4555Index0.includes(num2),
               }
-              element.feature_1_appear_list.push(numberApear)
+              element.appearListData.push(numberApear)
             }
           })
         }
       })
   }
-  const sortTwoList = _.orderBy(element.feature_1_appear_list, ['total'], ['asc'])
 
-  // nearly appear
+  const sortTwoList = _.orderBy(element.appearListData, ['total'], ['asc'])
+
   for (let n = i; n < listData.length; n++) {
     const nearlyElement = listData[n]
-    // count
-    element.feature_1_nearly_how_manu_version_from_index0 =
-      element.feature_1_nearly_how_manu_version_from_index0
-        ? element.feature_1_nearly_how_manu_version_from_index0 + 1
+    element.nearlyHowManyVersionFromIndex0 =
+      element.nearlyHowManyVersionFromIndex0
+        ? element.nearlyHowManyVersionFromIndex0 + 1
         : 1
-    // add number
     nearlyElement.numberResult.forEach((num: string) => {
-      if (!element.feature_1_nearly_set_numbers_from_index0.has(num)) {
-        element.feature_1_nearly_set_numbers_from_index0.add(num)
+      if (!element.nearlySetNumbersFromIndex0.has(num)) {
+        element.nearlySetNumbersFromIndex0.add(num)
       }
     })
-    if (element.feature_1_nearly_set_numbers_from_index0.size >= element.loteType) {
+    if (element.nearlySetNumbersFromIndex0.size >= element.loteType) {
       break
     }
   }
-  if (element.feature_1_nearly_set_numbers_from_index0.size < element.loteType) {
-    element.feature_1_nearly_how_manu_version_from_index0 = undefined
+  if (element.nearlySetNumbersFromIndex0.size < element.loteType) {
+    element.nearlyHowManyVersionFromIndex0 = undefined
   }
 
-  // no number
   const numberSet = new Set<string>()
-  element.feature_1_appear_list.forEach((item) => {
+  element.appearListData.forEach((item) => {
     numberSet.add(item.number)
   })
   const appearO: ApearType[] = []
-  element.feature_1_nearly_set_numbers_from_index0.forEach((number: string) => {
+  element.nearlySetNumbersFromIndex0.forEach((number: string) => {
     if (numberSet.has(number)) {
       return
     }
@@ -186,218 +229,105 @@ function feature_1(
       total: 0,
       isResult: element.nextItem?.numberResult.includes(number) || false,
       isResult2: element.nextItem?.extraNumber === number,
-      isDuplicate: element.feature_1_duplicate_numbers_45_55_at_index0.includes(number),
+      isDuplicate: element.duplicateNumbers4555Index0.includes(number),
     }
     appearO.push(appear)
   })
-  element.feature_1_appear_list_total = [...appearO, ...sortTwoList]
+  element.appearListTotal = [...appearO, ...sortTwoList]
 
-  // nearly and total
-  element.feature_1_nearly_set_numbers_from_index0.forEach((number: string) => {
-    const findItem = element.feature_1_appear_list_total.find((item) => item.number === number)
+  element.nearlySetNumbersFromIndex0.forEach((number: string) => {
+    const findItem = element.appearListTotal.find((item) => item.number === number)
     if (findItem) {
-      element.feature_1_nearly_appear_list.push(findItem)
+      element.nearlyAppearList.push(findItem)
     }
   })
-  element.feature_1_nearly_appear_list = _.orderBy(
-    element.feature_1_nearly_appear_list,
+  element.nearlyAppearList = _.orderBy(
+    element.nearlyAppearList,
     ['total'],
     ['asc'],
   )
 
-  // find index
   if (element.nextItem) {
     const indexSorted: number[] = []
     const mapNextResult =
       element.nextItem?.numberResult.filter((num) =>
-        element.feature_1_appear_list_total.some((item) => item.number === num),
+        element.appearListTotal.some((item) => item.number === num),
       ).length || 0
     element.nextItem?.numberResult.forEach((num) => {
-      const index = element.feature_1_appear_list_total.findIndex((item) => item.number === num)
+      const index = element.appearListTotal.findIndex((item) => item.number === num)
       const patternIndex = index % 6
       if (index !== -1) {
         indexSorted.push(index)
         if (mapNextResult === 6) {
-          element.feature_1_appear_pattern_list_total[patternIndex]++
+          element.appearPatternListTotal[patternIndex]++
         }
       }
     })
-    element.feature_1_appear_index_list_total = indexSorted
+    element.appearIndexListTotal = indexSorted
     const sorted = [...indexSorted].sort((a, b) => a - b)
     const distances = sorted.slice(1).map((val, i) => val - sorted[i])
-    element.feature_1_appear_spacing_list_index_total = distances
+    element.appearSpacingListIndexTotal = distances
   }
+
   if (element.nextItem) {
     const indexSorted: number[] = []
     element.nextItem?.numberResult.forEach((num) => {
-      const index = element.feature_1_nearly_appear_list.findIndex((item) => item.number === num)
+      const index = element.nearlyAppearList.findIndex((item) => item.number === num)
       if (index !== -1) {
         indexSorted.push(index)
       }
     })
-    element.feature_1_nearly_index_appear_list = indexSorted
+    element.nearlyIndexAppearList = indexSorted
     const sorted = [...indexSorted].sort((a, b) => a - b)
     const distances = sorted.slice(1).map((val, i) => val - sorted[i])
-    element.feature_1_nearly_spacing_list_index = distances
-  }
-
-  const twoListIndex: number[] = [0, 1, 2, 3, 4, 5]
-  if ((twoListIndex.length === 0 || twoListIndex.includes(i)) && element.loteType === 55) {
-    const limit = twoListIndex.length === 0 ? 0 : 46
-    twoListPrediction(i, element, limit)
+    element.nearlySpacingListIndex = distances
   }
 }
 
-function twoListPrediction(i: number, element: LoteObject, limit: number = 46) {
-  console.log('================= start with i = ', i + ' =================')
-
-  let apearList: ApearType[] = []
-  let list55Prototype: ApearType[] = []
-  const nextNumbers = element.nextItem?.numberResult || []
-  const endList = []
-  const idxList: number[][] = []
-  // 55
-  element.numberResult.forEach((num) => {
-    const newIndex = Number(num)
-    const el55 = listData55[newIndex + i]
-    if (el55) {
-      el55.numberResult.forEach((num2) => {
-        const findItem = apearList.find((item) => item.number === num2)
-        if (findItem) {
-          findItem.total++
-        } else {
-          const numberApear: ApearType = {
-            number: num2,
-            total: 1,
-            isResult: false,
-            isResult2: false,
-            isDuplicate: false,
-          }
-          apearList.push(numberApear)
-        }
-      })
-    }
-  })
-  if (apearList.length === 0) {
-    return
-  }
-
-  list55Prototype = cloneDeep(apearList)
-
-  // 45
-  for (let k = i; k < listData55.length - 1; k++) {
-    apearList = cloneDeep(list55Prototype)
-
-    const element45 = listData45[k]
-    element45.numberResult.forEach((num) => {
-      const newIndex = Number(num)
-      /**
-       * bắt đầu từ k
-       * index là new index
-       */
-      const el55By45 = listData55[k + newIndex - offsetLoteType55]
-      if (el55By45) {
-        el55By45.numberResult.forEach((num2) => {
-          const findItem = apearList.find((item) => item.number === num2)
-          if (findItem) {
-            findItem.total++
-          } else {
-            const numberApear: ApearType = {
-              number: num2,
-              total: 1,
-              isResult: false,
-              isResult2: false,
-              isDuplicate: false,
-            }
-            apearList.push(numberApear)
-          }
-        })
-      }
-    })
-
-    const sortTwoList = _.orderBy(apearList, ['total'], ['asc'])
-    const list = [...sortTwoList.map((item) => item.number)]
-    if (list.length >= limit) {
-      endList.push(list)
-      const indexList: number[] = []
-      nextNumbers.forEach((num11) => {
-        const idx = list.findIndex((num) => num === num11)
-        if (idx != -1) {
-          indexList.push(idx)
-        }
-      })
-      const total = list.filter((n) => nextNumbers.includes(n)).length
-      if (total === 6) {
-        idxList.push(indexList.sort((a, b) => a - b))
-      }
-      if (limit >= 46) {
-        console.log('max tran = ', endList.length)
-        console.log(list.length, total)
-        console.log('index = ', k - i)
-      }
-    }
-  }
-  if (limit >= 46) {
-    console.log(nextNumbers, 'next')
-    console.log(element.numberResult, 'current')
-    console.log(endList, 'list')
-    console.log('index list = ', idxList)
-    console.log('================')
-  }
-
-  listIndexList.push(sortNestedArray(idxList))
-}
-// end function feature 1
-
-// filter feature 1
 let resultMap = 0
-function feature_1_resultMap(event: Event) {
+let filterTwoListSize = -1
+let filterDuplicateTwoListSize = -1
+
+function handleDisplayResultMapping(event: Event) {
   const target = event.target as HTMLSelectElement
   const size = Number(target.value)
   resultMap = size
-  feature_1_filterTwoList_handle()
+  handleFilterDisplayFeature()
 }
-
-const twoListColumn = ref(6)
-function feature_1_columnTwoList(event: Event) {
+function columnDisplayMany(event: Event) {
   const target = event.target as HTMLSelectElement
   const column = Number(target.value)
   twoListColumn.value = column
 }
-
-let filterTwoListSize = -1
-function feature_1_filterTwoList(event: Event) {
+function handleFilterNumbersApear(event: Event) {
   const target = event.target as HTMLSelectElement
   const size = Number(target.value)
   filterTwoListSize = size
-  feature_1_filterTwoList_handle()
+  handleFilterDisplayFeature()
 }
-
-let filterDuplicateTwoListSize = -1
-function feature_1_filterDuplicateTwoList(event: Event) {
+function handleFilterDuplicateResult(event: Event) {
   const target = event.target as HTMLSelectElement
   const size = Number(target.value)
   filterDuplicateTwoListSize = size
-  feature_1_filterTwoList_handle()
+  handleFilterDisplayFeature()
 }
-
-function feature_1_filterTwoList_handle() {
+function handleFilterDisplayFeature() {
   let listData55Filter = listData55
   let listData45Filter = listData45
   if (filterTwoListSize !== -1) {
     listData55Filter = listData55Filter.filter((item: LoteObject) => {
-      return item.feature_1_set_numbers_from_result_45_55_at_index0.size === filterTwoListSize
+      return item.setNumbersFromResult4555Index0.size === filterTwoListSize
     })
     listData45Filter = listData45Filter.filter((item: LoteObject) => {
-      return item.feature_1_set_numbers_from_result_45_55_at_index0.size === filterTwoListSize
+      return item.setNumbersFromResult4555Index0.size === filterTwoListSize
     })
   }
   if (filterDuplicateTwoListSize !== -1) {
     listData55Filter = listData55Filter.filter((item: LoteObject) => {
-      return item.feature_1_duplicate_numbers_45_55_at_index0.length === filterDuplicateTwoListSize
+      return item.duplicateNumbers4555Index0.length === filterDuplicateTwoListSize
     })
     listData45Filter = listData45Filter.filter((item: LoteObject) => {
-      return item.feature_1_duplicate_numbers_45_55_at_index0.length === filterDuplicateTwoListSize
+      return item.duplicateNumbers4555Index0.length === filterDuplicateTwoListSize
     })
   }
   if (resultMap !== 0) {
@@ -405,7 +335,7 @@ function feature_1_filterTwoList_handle() {
       return (
         !item.nextItem?.numberResult ||
         item.nextItem?.numberResult.filter((num) =>
-          item.feature_1_set_numbers_from_result_45_55_at_index0.has(num),
+          item.setNumbersFromResult4555Index0.has(num),
         ).length === resultMap
       )
     })
@@ -413,26 +343,24 @@ function feature_1_filterTwoList_handle() {
       return (
         !item.nextItem?.numberResult ||
         item.nextItem?.numberResult.filter((num) =>
-          item.feature_1_set_numbers_from_result_45_55_at_index0.has(num),
+          item.setNumbersFromResult4555Index0.has(num),
         ).length === resultMap
       )
     })
   }
-  if (feature_1_filter_week.value) {
+  if (filterWithWeek.value) {
     listData55Filter = listData55Filter.filter(
-      (item: LoteObject) => item.weekOfDate === feature_1_filter_week.value,
+      (item: LoteObject) => item.weekOfDate === filterWithWeek.value,
     )
     listData45Filter = listData45Filter.filter(
-      (item: LoteObject) => item.weekOfDate === feature_1_filter_week.value,
+      (item: LoteObject) => item.weekOfDate === filterWithWeek.value,
     )
   }
   listData55Render.value = listData55Filter
   listData45Render.value = listData45Filter
 }
-// end filter feature 1
 
-// count 6 in two list
-function feature_1_filter_two_list_set_count_6(
+function setFilterWith2ResultsCount6(
   listData: Array<LoteObject>,
   element: LoteObject,
   i: number,
@@ -442,73 +370,69 @@ function feature_1_filter_two_list_set_count_6(
     const listApear = listData.filter((item, index) => {
       if (index > i) {
         return (
-          item.feature_1_set_numbers_from_result_45_55_at_index0.size ===
-          element.feature_1_set_numbers_from_result_45_55_at_index0.size
+          item.setNumbersFromResult4555Index0.size ===
+          element.setNumbersFromResult4555Index0.size
         )
       }
     })
     for (let j = 0; j < listApear.length; j++) {
       const item = listApear[j]
-      // count
-      element.feature_1_spacing_count_6_in_appear = element.feature_1_spacing_count_6_in_appear
-        ? element.feature_1_spacing_count_6_in_appear + 1
+      element.spacingCount6InAppear = element.spacingCount6InAppear
+        ? element.spacingCount6InAppear + 1
         : 1
       if (countNumber.size <= 0) {
-        element.feature_1_spacing_count_1_in_appear = element.feature_1_spacing_count_1_in_appear
-          ? element.feature_1_spacing_count_1_in_appear + 1
+        element.spacingCount1InAppear = element.spacingCount1InAppear
+          ? element.spacingCount1InAppear + 1
           : 1
       }
-      // add number
-      item.feature_1_appear_index_list_total.forEach((index: number) => {
-        const number = element.feature_1_appear_list_total[index].number
+      item.appearIndexListTotal.forEach((index: number) => {
+        const number = element.appearListTotal[index].number
         if (element.nextItem?.numberResult.includes(number)) {
           countNumber.add(number)
         }
       })
       if (countNumber.size === 6) {
-        element.feature_1_order_6_number_from_next_result = [...countNumber]
+        element.order6NumbersFromNextResult = [...countNumber]
         break
       }
     }
     if (countNumber.size <= 0) {
-      element.feature_1_spacing_count_1_in_appear = undefined
+      element.spacingCount1InAppear = undefined
     }
     if (countNumber.size < 6) {
-      element.feature_1_spacing_count_6_in_appear = undefined
+      element.spacingCount6InAppear = undefined
     }
   }
 }
-// end count 6 in two list
 
-//// end feature 1
-
-//// main feature
-function mainFeature(listData: Array<LoteObject>, offset: number = 0) {
+function runMainFeature(listData: Array<LoteObject>, offset: number = 0) {
   const oppositeListData = listData[0].loteType === 45 ? listData55 : listData45
-  // prepare data
   for (let i = 0; i < listData.length; i++) {
     const element = listData[i]
     const element2 = oppositeListData?.[i + offset]
 
-    feature_1(listData, element, element2, i)
-    // feature_1_filter_two_list
-    const total = element.feature_1_set_numbers_from_result_45_55_at_index0.size || 0
+    handleDisplayFeature(listData, element, element2, i)
+
+    const total = element.setNumbersFromResult4555Index0.size || 0
     if (total >= 30 && total <= 55) {
-      feature_1_filter_two_list_set.add(total)
+      setFilterWith2Results.add(total)
     }
+
+    const nextDate = new Date(element.nextTimestamp)
+    const date = nextDate.getDate()
+    const numberByNextDate = listData[date + i - 1]?.numberResult || []
+    element.numberByNextDate = numberByNextDate || []
   }
   for (let i = 0; i < listData.length; i++) {
     const element = listData[i]
-    feature_1_filter_two_list_set_count_6(listData, element, i)
+    setFilterWith2ResultsCount6(listData, element, i)
   }
 }
-//// end main feature
 
-/// common
 function twoListResult(item: LoteObject) {
   return (
     item.nextItem?.numberResult.filter((num) =>
-      item.feature_1_set_numbers_from_result_45_55_at_index0.has(num),
+      item.setNumbersFromResult4555Index0.has(num),
     ).length || 0
   )
 }
@@ -539,7 +463,34 @@ function resultNumberStyle(item: ApearType) {
   return style
 }
 
-/// end common
+function isFilterByDate(number: string, item: LoteObject): boolean {
+  if (!hideNumbersFromDateToIndex.value) {
+    return true
+  }
+  return !item.numberByNextDate.includes(number)
+}
+
+function duplicateNumbers(item: LoteObject, i: number): string[] {
+  const data = item.loteType === 45 ? listData45 : listData55
+  const listDupplicate: string[] = []
+  item.duplicateNumbers4555Index0.forEach((num) => {
+    listDupplicate.push(
+      ...(data[Number(num) + i]?.numberResult ?? [])
+    )
+  })
+  return listDupplicate
+}
+
+function dupplicateWithNumber(item: LoteObject, i: number): string[] {
+  return item.nextItem?.numberResult.filter((num) => item.numbersFromResult4555Index0.includes(num)) || []
+}
+
+function isFilterDuplicateNumbers(number: string, item: LoteObject): boolean {
+  if (!hideDuplicateNumbers.value) {
+    return true
+  }
+  return !item.numbersFromResult4555Index0.includes(number)
+}
 </script>
 
 <template>
@@ -551,71 +502,87 @@ function resultNumberStyle(item: ApearType) {
         </option>
       </select>
     </div>
-    <div>Feature_1<input v-model="feature_1_model" type="checkbox" /></div>
+    <div>Dự đoán cho: <span :style="{ color: 'greenyellow', fontSize: '18px' }">{{ predictionLoteType }}</span></div>
+    <div>Mở tính năng: <input v-model="isDisplayFeature" type="checkbox" /></div>
   </div>
-  <template v-if="feature_1_model">
-    <div :style="{ color: 'greenyellow' }">Mô Tả:</div>
-    <!-- feature 1 -->
-    <template v-if="feature_1_model">
-      <div :style="{ color: 'greenyellow', fontSize: '12px' }">
-        Từ kết quả gần nhất của 55 và 45 ta được 12 kết quả tương đương 72 số. đưa các số về thành 1
-        tập Set.<br />
-        - đếm số lần xuất hiện các số - sort theo(asc) số lần xuất hiện
-      </div>
+  <template v-if="isDisplayFeature">
+    <template v-if="isDisplayFeature">
       <div>
-        <span>ngày trong tuần:</span>
-        <select v-model="feature_1_filter_week" :style="{ width: '60px', height: '24px' }"
-          @change="feature_1_filterTwoList_handle">
-          <option value=""></option>
-          <option value="Tuesday">Tuesday</option>
-          <option value="Thursday">Thursday</option>
-          <option value="Saturday">Saturday</option>
-          <option value="Wednesday">Wednesday</option>
-          <option value="Friday">Friday</option>
-          <option value="Sunday">Sunday</option>
-        </select>
-        <span>Ẩn Xuất hiện 0 lần:<input v-model="feature_1_hide_0" type="checkbox" /></span>
-        Số cột danh sách hiển thị:
-        <select v-model="twoListColumn" @change="feature_1_columnTwoList" :style="{ width: '60px', height: '24px' }">
-          <option value="10">10 col</option>
-          <option value="9">9 col</option>
-          <option value="8">8 col</option>
-          <option value="7">7 col</option>
-          <option value="6">6 col</option>
-          <option value="5">5 col</option>
-          <option value="4">4 col</option>
-          <option value="3">3 col</option>
-          <option value="2">2 col</option>
-          <option value="1">1 col</option>
-        </select>
-        Số kết quả:
-        <select @change="feature_1_resultMap" :style="{ width: '40px', height: '24px' }">
-          <option value="0">0</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-        </select>
-        <select v-model="feature_1_filter" :style="{ width: '100px', height: '24px' }">
-          <option value="two-list">2 danh sách</option>
-        </select>
-        <template v-if="feature_1_filter === 'two-list'">
-          <select @change="feature_1_filterTwoList" :style="{ width: '50px', height: '24px' }">
-            <option v-for="(option, index) in feature_1_filter_two_list" :value="option.value" :key="index">
-              {{ option.text }}
-            </option>
+        <div>
+          Lọc ngày trong tuần:
+          <select v-model="filterWithWeek" :style="{ width: '100px', height: '24px' }"
+            @change="handleFilterDisplayFeature">
+            <option value="">Tất cả</option>
+            <option value="Tuesday">Thứ 3</option>
+            <option value="Wednesday">Thứ 4</option>
+            <option value="Thursday">Thứ 5</option>
+            <option value="Friday">Thứ 6</option>
+            <option value="Saturday">Thứ 7</option>
+            <option value="Sunday">Chủ nhật</option>
           </select>
-          <select @change="feature_1_filterDuplicateTwoList" :style="{ width: '60px', height: '24px' }">
-            <option value="-1">clear</option>
-            <option value="0">-0-</option>
-            <option value="1">-1-</option>
-            <option value="2">-2-</option>
-            <option value="3">-3-</option>
+        </div>
+        <div>
+          <span>
+            <input v-model="hideAppearIs0" type="checkbox" />
+            Ẩn các số có số lần xuất hiện là 0
+          </span>
+        </div>
+        <div>
+          <span>
+            <input v-model="hideNumbersFromDateToIndex" type="checkbox" /> Ẩn các số, lấy ngày làm chỉ mục,
+          </span>
+          <div :style="{ color: 'greenyellow' }">(ngày 24/07/2020 chỉ mục là 24, từ vị trí đó đếm tới 24 thì lấy kết
+            quả)</div>
+        </div>
+        <div>
+          <span>
+            <input v-model="hideDuplicateNumbers" type="checkbox" /> Ẩn các số bởi trùng
+          </span>
+        </div>
+        <div>
+          Số cột danh sách hiển thị:
+          <select v-model="twoListColumn" @change="columnDisplayMany" :style="{ width: '80px', height: '24px' }">
+            <option value="10">10 Cột</option>
+            <option value="9">9 Cột</option>
+            <option value="8">8 Cột</option>
+            <option value="7">7 Cột</option>
+            <option value="6">6 Cột</option>
+            <option value="5">5 Cột</option>
+            <option value="4">4 Cột</option>
+            <option value="3">3 Cột</option>
+            <option value="2">2 Cột</option>
+            <option value="1">1 Cột</option>
           </select>
-        </template>
+        </div>
+        <div>Lọc dữ liệu hiển thị:</div>
+        <div>
+          <select @change="handleDisplayResultMapping" :style="{ width: '160px', height: '24px' }">
+            <option value="0">Số kết quả: tất cả</option>
+            <option value="5">Số kết quả: 5</option>
+            <option value="6">Số kết quả: 6</option>
+          </select>
+          <select v-model="filterWith2Result" :style="{ width: '150px', height: '24px' }">
+            <option value="two-list">2 danh sách 45 và 55</option>
+          </select>
+          <template v-if="filterWith2Result === 'two-list'">
+            <select @change="handleFilterNumbersApear" :style="{ width: '170px', height: '24px' }">
+              <option v-for="(option, index) in arrayFilterFor2Result" :value="option.value" :key="index">
+                Số lượng xuất hiện: {{ option.text }}
+              </option>
+            </select>
+            <select @change="handleFilterDuplicateResult" :style="{ width: '170px', height: '24px' }">
+              <option value="-1">Kết quả trùng: tất cả</option>
+              <option value="0">Kết quả trùng: 0</option>
+              <option value="1">Kết quả trùng: 1</option>
+              <option value="2">Kết quả trùng: 2</option>
+              <option value="3">Kết quả trùng: 3</option>
+            </select>
+          </template>
+        </div>
       </div>
     </template>
   </template>
   <div class="content">
-    <!-- Data 55 -->
     <div>
       <div>Total: {{ listData55Render?.length }}</div>
       <div v-for="(item, index) in listData55Render?.slice(0, totalSelected)" :key="`listData-${index}`">
@@ -625,78 +592,112 @@ function resultNumberStyle(item: ApearType) {
           </div>
           <div>{{ item.numberResult }}</div>
         </div>
-        <!-- feature 1 -->
-        <template v-if="feature_1_model">
-          <div class="feature_1">Feature_1:</div>
+        <template v-if="isDisplayFeature">
           <div>
             Sô kết quả:
             <span :style="twoListResultStyle(item)">{{ twoListResult(item) }}</span>
           </div>
           <div>
-            Số lượng xuất hiện: {{ item.feature_1_set_numbers_from_result_45_55_at_index0.size }}
+            Số lượng xuất hiện: {{ item.setNumbersFromResult4555Index0.size }}
           </div>
           <div>
-            Kết quả trùng: {{ item.feature_1_duplicate_numbers_45_55_at_index0 }}
+            Kết quả trùng: {{ item.duplicateNumbers4555Index0 }}
             <template v-if="item.nextItem">
-              {{
-                item.nextItem?.numberResult.filter((num) =>
-                  item.feature_1_duplicate_numbers_45_55_at_index0.includes(num),
-                )
+              , Trùng với dự đoán: {{
+                dupplicateWithNumber(item, index)
               }}
             </template>
           </div>
           <div>
             6 số xuất hiện gần nhất cách
             <span :style="{ color: 'red' }">{{
-              item.feature_1_nearly_how_manu_version_from_index0
-                ? item.feature_1_nearly_how_manu_version_from_index0
+              item.nearlyHowManyVersionFromIndex0
+                ? item.nearlyHowManyVersionFromIndex0
                 : 'chưa có'
             }}</span>
             kỳ
+            <div :style="{ color: 'greenyellow' }">
+              (các số {{ item.numberResult }}
+              xuất hiện từ
+              <div>
+                {{ item.nearlyHowManyVersionFromIndex0
+                  ? item.nearlyHowManyVersionFromIndex0
+                  : 'chưa có' }}
+                kỳ trước đó)
+              </div>
+            </div>
           </div>
           <div>
             Lọc với
             <span :style="{ color: 'CadetBlue' }">{{
-              item.feature_1_set_numbers_from_result_45_55_at_index0.size
+              item.setNumbersFromResult4555Index0.size
             }}</span>
             số đầu tiên xuất hiện gần nhất cách
             <span :style="{ color: 'red' }">{{
-              item.feature_1_spacing_count_1_in_appear
-                ? item.feature_1_spacing_count_1_in_appear
+              item.spacingCount1InAppear
+                ? item.spacingCount1InAppear
                 : 'chưa có'
             }}</span>
+            <div :style="{ color: 'greenyellow' }">
+              (với danh sách có
+              {{ item.setNumbersFromResult4555Index0.size }}
+              xuất hiện thì 1 trong
+              <div>
+                các số {{ item.nextItem?.numberResult || [] }}
+              </div>
+              <div>
+                sẽ xuất hiện gần nhất cách
+                {{ item.spacingCount1InAppear
+                  ? item.spacingCount1InAppear
+                  : '"không xác định"' }}
+                kỳ trước đó)
+              </div>
+            </div>
           </div>
           <div>
             Lọc với
             <span :style="{ color: 'CadetBlue' }">{{
-              item.feature_1_set_numbers_from_result_45_55_at_index0.size
+              item.setNumbersFromResult4555Index0.size
             }}</span>
             6 số xuất hiện gần nhất cách
             <span :style="{ color: 'red' }">{{
-              item.feature_1_spacing_count_6_in_appear
-                ? item.feature_1_spacing_count_6_in_appear
+              item.spacingCount6InAppear
+                ? item.spacingCount6InAppear
                 : 'chưa có'
             }}</span>
+            <div :style="{ color: 'greenyellow' }">
+              (với danh sách có
+              {{ item.setNumbersFromResult4555Index0.size }}
+              xuất hiện thì
+              <div>các số {{ item.nextItem?.numberResult || [] }}</div>
+              <div>
+                sẽ xuất hiện gần nhất cách
+                {{ item.spacingCount6InAppear
+                  ? item.spacingCount6InAppear
+                  : '"không xác định"' }}
+                kỳ trước đó)
+              </div>
+
+            </div>
           </div>
           <div>Danh sách xuất hiện:</div>
           <div :style="{
             maxWidth: 34 * twoListColumn + 'px',
             flexWrap: 'wrap',
-          }" class="d-flex value-color">
-            <template v-for="(numberTotal, indexNumberTotal) in item.feature_1_appear_list_total">
+          }" class="d-flex">
+            <template v-for="(numberTotal, indexNumberTotal) in item.appearListTotal">
               <div :key="`row-element${index}${indexNumberTotal}`" :style="{
                 width: '34px',
-              }" v-if="numberTotal.total !== 0 || (numberTotal.total === 0 && !feature_1_hide_0)">
+              }" v-if="
+                (numberTotal.total !== 0 || (numberTotal.total === 0 && !hideAppearIs0)) &&
+                isFilterByDate(numberTotal.number, item) && isFilterDuplicateNumbers(numberTotal.number, item)">
                 <span :style="resultNumberStyle(numberTotal)">{{ numberTotal.number }}:{{ numberTotal.total }}</span>
               </div>
             </template>
           </div>
         </template>
-        <!-- feature_1 end -->
       </div>
     </div>
-    <!-- end -->
-    <!-- Data 45 -->
     <div>
       <div>Total: {{ listData45Render?.length }}</div>
       <div v-for="(item, index) in listData45Render?.slice(0, totalSelected)" :key="`listData-${index}`">
@@ -706,83 +707,111 @@ function resultNumberStyle(item: ApearType) {
           </div>
           <div>{{ item.numberResult }}</div>
         </div>
-        <!-- feature 1 -->
-        <template v-if="feature_1_model">
-          <div class="feature_1">Feature_1:</div>
+        <template v-if="isDisplayFeature">
           <div>
             Sô kết quả:
             <span :style="twoListResultStyle(item)">{{ twoListResult(item) }}</span>
           </div>
           <div>
-            Số lượng xuất hiện: {{ item.feature_1_set_numbers_from_result_45_55_at_index0.size }}
+            Số lượng xuất hiện: {{ item.setNumbersFromResult4555Index0.size }}
           </div>
           <div>
-            Kết quả trùng: {{ item.feature_1_duplicate_numbers_45_55_at_index0 }}
+            Kết quả trùng: {{ item.duplicateNumbers4555Index0 }}
             <template v-if="item.nextItem">
-              {{
-                item.nextItem?.numberResult.filter((num) =>
-                  item.feature_1_duplicate_numbers_45_55_at_index0.includes(num),
-                )
+              , Trùng với dự đoán: {{
+                dupplicateWithNumber(item, index)
               }}
             </template>
           </div>
           <div>
             6 số xuất hiện gần nhất cách
             <span :style="{ color: 'red' }">{{
-              item.feature_1_nearly_how_manu_version_from_index0
-                ? item.feature_1_nearly_how_manu_version_from_index0
+              item.nearlyHowManyVersionFromIndex0
+                ? item.nearlyHowManyVersionFromIndex0
                 : 'chưa có'
             }}</span>
             kỳ
+            <div :style="{ color: 'greenyellow' }">
+              ({{ item.numberResult }}
+              xuất hiện từ
+              {{ item.nearlyHowManyVersionFromIndex0
+                ? item.nearlyHowManyVersionFromIndex0
+                : 'chưa có' }}
+              kỳ trước đó)
+            </div>
           </div>
           <div>
             Lọc với
             <span :style="{ color: 'CadetBlue' }">{{
-              item.feature_1_set_numbers_from_result_45_55_at_index0.size
+              item.setNumbersFromResult4555Index0.size
             }}</span>
             số đầu tiên xuất hiện gần nhất cách
             <span :style="{ color: 'red' }">{{
-              item.feature_1_spacing_count_1_in_appear
-                ? item.feature_1_spacing_count_1_in_appear
+              item.spacingCount1InAppear
+                ? item.spacingCount1InAppear
                 : 'chưa có'
             }}</span>
+            <div :style="{ color: 'greenyellow' }">
+              (với danh sách có
+              {{ item.setNumbersFromResult4555Index0.size }}
+              xuất hiện thì 1 trong 6 số "dự đoán"
+              <div>
+                sẽ xuất hiện gần nhất cách
+                {{ item.spacingCount1InAppear
+                  ? item.spacingCount1InAppear
+                  : '"không xác định"' }}
+              </div>
+              kỳ trước đó)
+            </div>
           </div>
           <div>
             Lọc với
             <span :style="{ color: 'CadetBlue' }">{{
-              item.feature_1_set_numbers_from_result_45_55_at_index0.size
+              item.setNumbersFromResult4555Index0.size
             }}</span>
             6 số xuất hiện gần nhất cách
             <span :style="{ color: 'red' }">{{
-              item.feature_1_spacing_count_6_in_appear
-                ? item.feature_1_spacing_count_6_in_appear
+              item.spacingCount6InAppear
+                ? item.spacingCount6InAppear
                 : 'chưa có'
             }}</span>
+            <div :style="{ color: 'greenyellow' }">
+              (với danh sách có
+              {{ item.setNumbersFromResult4555Index0.size }}
+              xuất hiện thì 6 số "dự đoán"
+              <div>
+                sẽ xuất hiện gần nhất cách
+                {{ item.spacingCount6InAppear
+                  ? item.spacingCount6InAppear
+                  : '"không xác định"' }}
+              </div>
+              kỳ trước đó)
+            </div>
           </div>
           <div>Danh sách xuất hiện:</div>
           <div :style="{
             maxWidth: 34 * twoListColumn + 'px',
             flexWrap: 'wrap',
           }" class="d-flex value-color">
-            <template v-for="(numberTotal, indexNumberTotal) in item.feature_1_appear_list_total">
+            <template v-for="(numberTotal, indexNumberTotal) in item.appearListTotal">
               <div :key="`row-element${index}${indexNumberTotal}`" :style="{
                 width: '34px',
-              }" v-if="numberTotal.total !== 0 || (numberTotal.total === 0 && !feature_1_hide_0)">
+              }" v-if="
+                (numberTotal.total !== 0 || (numberTotal.total === 0 && !hideAppearIs0)) &&
+                isFilterByDate(numberTotal.number, item) && isFilterDuplicateNumbers(numberTotal.number, item)">
                 <span :style="resultNumberStyle(numberTotal)">{{ numberTotal.number }}:{{ numberTotal.total }}</span>
               </div>
             </template>
           </div>
         </template>
-        <!-- feature_1 end -->
       </div>
     </div>
-    <!-- end -->
   </div>
 </template>
 <style lang="css">
 body {
-  background-color: black;
-  color: wheat;
+  background: linear-gradient(to right, #1F1C18, #8E0E00);
+  color: #CCFF00;
 }
 
 .content {
@@ -794,16 +823,8 @@ body {
   color: coral;
 }
 
-.feature_1 {
-  color: greenyellow;
-}
-
 .d-flex {
   display: flex;
   align-items: center;
-}
-
-.value-color {
-  color: white;
 }
 </style>

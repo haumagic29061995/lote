@@ -1,6 +1,7 @@
 import lote45Content from '@/assets/csv/lote45.csv?raw'
 import lote55Content from '@/assets/csv/lote55.csv?raw'
 import { LoteObject } from '@/types/lote'
+import { getNextLoteTimestamp } from '@/utils'
 import moment from 'moment'
 
 export function getLote45(): Array<LoteObject> {
@@ -27,6 +28,7 @@ export function getLote45(): Array<LoteObject> {
 
     const nextItem: LoteObject | undefined = result[result.length - 1]
     const dataIndex: number = result.length
+    const nextTimestamp: number = getNextLoteTimestamp(timestamp, loteType)
     // construction
     const obj = new LoteObject({
       loteType,
@@ -40,7 +42,7 @@ export function getLote45(): Array<LoteObject> {
       month,
       year,
       timestamp,
-
+      nextTimestamp,
       nextItem,
     })
     result.push(obj)
@@ -71,7 +73,7 @@ export function getLote55(): Array<LoteObject> {
     const timestamp = moment(dateVn, 'DD/MM/YYYY').valueOf()
 
     const nextItem: LoteObject | undefined = result[result.length - 1]
-
+    const nextTimestamp: number = getNextLoteTimestamp(timestamp, loteType)
     const dataIndex: number = result.length
     // construction
     const obj = new LoteObject({
@@ -86,7 +88,7 @@ export function getLote55(): Array<LoteObject> {
       month,
       year,
       timestamp,
-
+      nextTimestamp,
       nextItem,
     })
     result.push(obj)
