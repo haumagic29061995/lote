@@ -1,830 +1,543 @@
 <script setup lang="ts">
-import { getLote45, getLote55 } from '@/composables/lote'
-import { LoteObject, type ApearRepeat, type ApearType } from '@/types/lote'
-import { type DropdownType } from '@/types/common'
-import { generateOptions } from '@/utils'
 import _ from 'lodash'
 import { ref } from 'vue'
 import moment from 'moment'
 
-const listData45: Array<LoteObject> = getLote45()
-const listData55: Array<LoteObject> = getLote55()
+import { lấy_dữ_liệu_xổ_số_45, lấy_dữ_liệu_xổ_số_55 } from '@/composables/lote'
 
-const setRepeat45: ApearRepeat[] = []
-const setRepeat55: ApearRepeat[] = []
+import { Đối_Tượng_Xổ_Số, type Loại_Dữ_Liệu_Xuât_Hiện } from '@/types/lote'
 
-generateSetRepeat45()
-function generateSetRepeat45() {
-  for (let i = 1; i <= 45; i++) {
-    const number = i.toString().padStart(2, '0')
-    const appear: ApearRepeat = {
-      number,
-      total: 0,
-      maxRepeat: 0,
-    }
-    setRepeat45.push(appear)
+import { tạo_tùy_chọn_để_hiển_thị } from '@/utils'
+
+//
+// các biến không dùng ràng buộc hiển thị
+//
+
+const dữ_liệu_xổ_số_45: Array<Đối_Tượng_Xổ_Số> = lấy_dữ_liệu_xổ_số_45()
+const dữ_liệu_xổ_số_55: Array<Đối_Tượng_Xổ_Số> = lấy_dữ_liệu_xổ_số_55()
+
+const ngày_cuối_cùng_mở_xổ_số_45 = moment(dữ_liệu_xổ_số_45[0].ngày_xổ_số, 'DD/MM/YYYY')
+const ngày_cuối_cùng_mở_xổ_số_55 = moment(dữ_liệu_xổ_số_55[0].ngày_xổ_số, 'DD/MM/YYYY')
+
+const số_lượng_dữ_liệu_tối_đa_có_thể_hiển_thị = dữ_liệu_xổ_số_45.length
+const mở_xổ_số_loại_tiếp_theo: number =
+  ngày_cuối_cùng_mở_xổ_số_45 > ngày_cuối_cùng_mở_xổ_số_55 ? 55 : 45
+
+const bù_trừ_cho_loại_xổ_số_45: number = mở_xổ_số_loại_tiếp_theo === 45 ? 0 : -1
+const bù_trừ_cho_loại_xổ_số_55: number = mở_xổ_số_loại_tiếp_theo === 55 ? 0 : -1
+
+//
+// các biến dùng ràng buộc để hiển thị
+//
+
+const các_tùy_chọn_để_hiển_thị_dữ_liệu = ref<number[]>([])
+const số_dữ_liệu_sẽ_được_hiển_thị = ref<number>(7)
+
+const có_hiển_thị_chi_tiết = ref<boolean>(false)
+
+const danh_sách_dữ_liệu_hiển_thị_45 = ref<Array<Đối_Tượng_Xổ_Số>>()
+const danh_sách_dữ_liệu_hiển_thị_55 = ref<Array<Đối_Tượng_Xổ_Số>>()
+
+//
+// chạy các hàm
+//
+
+chạy_chức_năng_chính(dữ_liệu_xổ_số_45, bù_trừ_cho_loại_xổ_số_45)
+chạy_chức_năng_chính(dữ_liệu_xổ_số_55, bù_trừ_cho_loại_xổ_số_55)
+
+function chạy_chức_năng_chính(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>, offset: number = 0) {
+  const danh_sách_dữ_liệu_45_hoặc_55 =
+    danh_sách_dữ_liệu[0].loại_xổ_số === 45 ? dữ_liệu_xổ_số_55 : dữ_liệu_xổ_số_45
+
+  for (let vị_trí_dữ_liệu = 0; vị_trí_dữ_liệu < danh_sách_dữ_liệu.length; vị_trí_dữ_liệu++) {
+    const dữ_liệu_1 = danh_sách_dữ_liệu[vị_trí_dữ_liệu]
+    const dữ_liệu_2 = danh_sách_dữ_liệu_45_hoặc_55?.[vị_trí_dữ_liệu + offset]
+
+    // dự đoán bằng ngày xổ số
+    dữ_đoán_bằng_ngày_xổ_số(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
+
+    // dự đoán bằng tổng ngày
+    dự_đoán_bằng_tổng_ngày(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
+
+    // dự đoán bằng tổng ngày tháng
+    dự_đoán_bằng_tổng_ngày_tháng(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
+
+    // dự đoán bằng tổng trong ngày tháng
+    dự_đoán_bằng_tổng_trong_ngày_tháng(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
+
+    // dự đoán bằng tổng trong ngày tháng năm
+    dự_đoán_kết_quả_bằng_tổng_ngày_tháng_năm(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
+
+    // dự đoán bàng các số trùng
+    dự_đoán_bằng_vị_trí_của_các_số_trùng(dữ_liệu_1, dữ_liệu_2, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
+
+    // xữ lý dữ liệu xuất hiện
+    xữ_lý_dữ_liệu_xuất_hiện(danh_sách_dữ_liệu, dữ_liệu_1, dữ_liệu_2, vị_trí_dữ_liệu)
+    dữ_liệu_1.số_kết_quả_trong_các_số_đã_xuất_hiện =
+      dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((num) =>
+        dữ_liệu_1.tập_các_số_đã_xuất_hiện.has(num),
+      ).length || 0
   }
 }
 
-generateSetRepeat55()
-function generateSetRepeat55() {
-  for (let i = 1; i <= 55; i++) {
-    const number = i.toString().padStart(2, '0')
-    const appear: ApearRepeat = {
-      number,
-      total: 0,
-      maxRepeat: 0,
-    }
-    setRepeat55.push(appear)
-  }
-}
-
-const maxLength = listData45.length
-const totalOptions = ref<number[]>([])
-totalOptions.value = generateOptions(maxLength)
-
-const totalSelected = ref<number>(7)
-
-const momentDate1 = moment(listData45[0].date, 'DD/MM/YYYY')
-const momentDate2 = moment(listData55[0].date, 'DD/MM/YYYY')
-const predictionLoteType: number = momentDate1 > momentDate2 ? 55 : 45
-console.log('Dự đoán hôm nay: ', predictionLoteType);
-
-const offsetLoteType55: number = predictionLoteType === 55 ? 0 : -1
-const offsetLoteType45: number = predictionLoteType === 45 ? 0 : -1
-
-const setFilterWith2Results = new Set<number>()
-
-const twoListColumn = ref(6)
-
-const isDisplayFeature = ref<boolean>(false)
-
-const hideAppearIs0 = ref<boolean>(false)
-
-const hideNumbersFromDateToIndex = ref<boolean>(false)
-
-const hideDuplicateNumbers = ref<boolean>(false)
-
-const filterWith2Result = ref<string>('')
-
-const filterWithWeek = ref<string>('')
-
-runMainFeature(listData45, offsetLoteType45)
-runMainFeature(listData55, offsetLoteType55)
-
-const listData45Render = ref<Array<LoteObject>>()
-listData45Render.value = listData45
-
-const listData55Render = ref<Array<LoteObject>>()
-listData55Render.value = listData55
-
-const arrayFilterFor2Result = ref<Array<DropdownType>>([])
-arrayFilterFor2Result.value = [...setFilterWith2Results.values()]
-  .sort()
-  .map((value) => {
-    const result: DropdownType = {
-      text: `${value}`,
-      value,
-    }
-    return result
-  })
-
-console.log('data list 45', listData45)
-console.log('data list 55', listData55)
-console.log('lập lại 45 number', setRepeat45)
-console.log('lập lại 55 number', setRepeat55)
-
-function handleSetRepeat45(element: LoteObject) {
-  if (element.loteType === 45) {
-    setRepeat45.forEach((item) => {
-      if (element.numberResult.includes(item.number)) {
-        item.total++
-      } else {
-        if (!item.maxRepeat || item.maxRepeat < item.total) {
-          item.maxRepeat = item.total
-        }
-        item.total = 0
-      }
-    })
-  }
-}
-
-function handleSetRepeat55(element: LoteObject) {
-  if (element.loteType === 55) {
-    setRepeat55.forEach((item) => {
-      if (element.numberResult.includes(item.number)) {
-        item.total++
-      } else {
-        if (!item.maxRepeat || item.maxRepeat < item.total) {
-          item.maxRepeat = item.total
-        }
-        item.total = 0
-      }
-    })
-  }
-}
-
-function handleDisplayFeature(
-  listData: Array<LoteObject>,
-  element: LoteObject,
-  element2: LoteObject | undefined,
-  i: number,
+function dữ_đoán_bằng_ngày_xổ_số(
+  dữ_liệu: Đối_Tượng_Xổ_Số,
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  vị_trí_dữ_liệu: number,
 ) {
+  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
+  const ngày_xổ_số = ngày_xổ_số_tiếp_theo.getDate()
+  const danh_sách_dự_đoán = danh_sách_dữ_liệu[ngày_xổ_số + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
+  const kết_quả_dư_đoán =
+    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
+      danh_sách_dự_đoán.includes(số_dự_đoán),
+    ).length || 0
 
-  handleSetRepeat45(element)
+  dữ_liệu.danh_sách_dự_đoán_bằng_ngày_xổ_số = danh_sách_dự_đoán
+  dữ_liệu.kết_quả_dự_đoán_bằng_ngày_xổ_số = kết_quả_dư_đoán
+}
 
-  handleSetRepeat55(element)
+function dự_đoán_bằng_tổng_ngày(
+  dữ_liệu: Đối_Tượng_Xổ_Số,
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  vị_trí_dữ_liệu: number,
+) {
+  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
+  const tổng_ngày = ngày_xổ_số_tiếp_theo
+    .getDate()
+    .toString()
+    .split('')
+    .reduce((tổng, số) => tổng + Number(số), 0)
+  const danh_sách_dự_đoán = danh_sách_dữ_liệu[tổng_ngày + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
+  const kết_quả_dư_đoán =
+    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
+      danh_sách_dự_đoán.includes(số_dự_đoán),
+    ).length || 0
 
-  const filterList: string[] = element.numberResult.filter((num) =>
-    element2?.numberResult.includes(num),
+  dữ_liệu.tổng_trong_ngày = tổng_ngày
+  dữ_liệu.danh_sách_dự_đoán_bẳng_tổng_trong_ngày = danh_sách_dự_đoán
+  dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày = kết_quả_dư_đoán
+}
+
+function dự_đoán_bằng_tổng_ngày_tháng(
+  dữ_liệu: Đối_Tượng_Xổ_Số,
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  vị_trí_dữ_liệu: number,
+) {
+  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
+  const tổng_ngày_tháng = ngày_xổ_số_tiếp_theo.getDate() + (ngày_xổ_số_tiếp_theo.getMonth() + 1)
+  const danh_sách_dự_đoán =
+    danh_sách_dữ_liệu[tổng_ngày_tháng + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
+  const kết_quả_dư_đoán =
+    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
+      danh_sách_dự_đoán.includes(số_dự_đoán),
+    ).length || 0
+
+  dữ_liệu.tổng_ngày_tháng = tổng_ngày_tháng
+  dữ_liệu.danh_sách_dự_đoán_bằng_tổng_ngày_tháng = danh_sách_dự_đoán
+  dữ_liệu.kết_quả_dự_đoán_bằng_tổng_ngày_tháng = kết_quả_dư_đoán
+}
+
+function dự_đoán_bằng_tổng_trong_ngày_tháng(
+  dữ_liệu: Đối_Tượng_Xổ_Số,
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  vị_trí_dữ_liệu: number,
+) {
+  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
+  const tổng_trong_ngày_tháng =
+    ngày_xổ_số_tiếp_theo
+      .getDate()
+      .toString()
+      .split('')
+      .reduce((tổng, số) => tổng + Number(số), 0) +
+    (ngày_xổ_số_tiếp_theo.getMonth() + 1)
+      .toString()
+      .split('')
+      .reduce((tổng, số) => tổng + Number(số), 0)
+  const danh_sách_dự_đoán =
+    danh_sách_dữ_liệu[tổng_trong_ngày_tháng + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
+  const kết_quả_dư_đoán =
+    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
+      danh_sách_dự_đoán.includes(số_dự_đoán),
+    ).length || 0
+
+  dữ_liệu.tổng_trong_ngày_tháng = tổng_trong_ngày_tháng
+  dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng = danh_sách_dự_đoán
+  dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng = kết_quả_dư_đoán
+}
+
+function dự_đoán_kết_quả_bằng_tổng_ngày_tháng_năm(
+  dữ_liệu: Đối_Tượng_Xổ_Số,
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  vị_trí_dữ_liệu: number,
+) {
+  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
+  const tổng_trong_ngày_tháng_năm =
+    ngày_xổ_số_tiếp_theo
+      .getDate()
+      .toString()
+      .split('')
+      .reduce((tổng, số) => tổng + Number(số), 0) +
+    (ngày_xổ_số_tiếp_theo.getMonth() + 1)
+      .toString()
+      .split('')
+      .reduce((tổng, số) => tổng + Number(số), 0) +
+    ngày_xổ_số_tiếp_theo
+      .getFullYear()
+      .toString()
+      .split('')
+      .reduce((tổng, số) => tổng + Number(số), 0)
+  const danh_sách_dự_đoán =
+    danh_sách_dữ_liệu[tổng_trong_ngày_tháng_năm + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
+  const kết_quả_dư_đoán =
+    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
+      danh_sách_dự_đoán.includes(số_dự_đoán),
+    ).length || 0
+
+  dữ_liệu.tổng_trong_ngày_tháng_năm = tổng_trong_ngày_tháng_năm
+  dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng_năm = danh_sách_dự_đoán
+  dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng_năm = kết_quả_dư_đoán
+}
+
+function dự_đoán_bằng_vị_trí_của_các_số_trùng(
+  dữ_liệu_1: Đối_Tượng_Xổ_Số,
+  dữ_liệu_2: Đối_Tượng_Xổ_Số,
+  dữ_liệu_xổ_số: Array<Đối_Tượng_Xổ_Số>,
+  vị_trí_dữ_liệu: number,
+) {
+  const danh_sách_các_số_trùng: string[] = dữ_liệu_1.kết_quả_xổ_số.filter((số) =>
+    dữ_liệu_2?.kết_quả_xổ_số.includes(số),
   )
+  const tập_các_số_trùng: Set<string> = new Set()
+  danh_sách_các_số_trùng.forEach((số) => {
+    const số_từ_vị_trí = dữ_liệu_xổ_số[Number(số) + vị_trí_dữ_liệu]?.kết_quả_xổ_số
+    if (số_từ_vị_trí) {
+      số_từ_vị_trí.forEach((số2) => tập_các_số_trùng.add(số2))
+    }
+  })
+  const danh_sách_dự_đoán = Array.from(tập_các_số_trùng)
+  const kết_quả_dự_đoán = danh_sách_dự_đoán.filter((số) =>
+    dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.includes(số),
+  ).length
 
-  element.duplicateNumbers4555Index0 = filterList
-  element.numbersFromResult4555Index0 = duplicateNumbers(element, i)
+  dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau = danh_sách_các_số_trùng
+  dữ_liệu_1.danh_sách_dự_đoán_các_số_trùng = danh_sách_dự_đoán
+  dữ_liệu_1.kết_quả_dự_đoán_các_số_trùng = kết_quả_dự_đoán
+}
 
-  element.numberResult.forEach((num: string) => {
-    const idx: number = Number(num) + i
-    const elementItem: LoteObject = listData[idx]
-    if (elementItem) {
-      element.listResult4555Index0.push(elementItem.numberResult)
-      elementItem.numberResult.forEach((num2: string) => {
-        element.setNumbersFromResult4555Index0.add(num2)
-        const findItem = element.appearListData.find((item) => item.number === num2)
-        if (findItem) {
-          findItem.total++
+function xữ_lý_dữ_liệu_xuất_hiện(
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  dữ_liệu_1: Đối_Tượng_Xổ_Số,
+  dữ_liệu_2: Đối_Tượng_Xổ_Số | undefined,
+  vị_trí_dữ_liệu: number,
+) {
+  // xữ lý dữ liệu 1
+  dữ_liệu_1.kết_quả_xổ_số.forEach((số: string) => {
+    const vị_trí_từ_số_và_vị_trí_dữ_liệu: number = Number(số) + vị_trí_dữ_liệu
+    const dữ_liệu_từ_vị_trí_mới: Đối_Tượng_Xổ_Số = danh_sách_dữ_liệu[vị_trí_từ_số_và_vị_trí_dữ_liệu]
+    if (dữ_liệu_từ_vị_trí_mới) {
+      dữ_liệu_1.danh_sách_các_kết_quả_xổ_số_đã_xuất_hiện.push(dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số)
+      dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số.forEach((số2: string) => {
+        dữ_liệu_1.tập_các_số_đã_xuất_hiện.add(số2)
+        const dữ_liệu_tìm_thấy = dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.find(
+          (mục) => mục.số_xuất_hiện === số2,
+        )
+        if (dữ_liệu_tìm_thấy) {
+          dữ_liệu_tìm_thấy.tổng_xuất_hiện++
         } else {
-          const numberApear: ApearType = {
-            number: num2,
-            total: 1,
-            isResult: element.nextItem?.numberResult.includes(num2) || false,
-            isResult2: element.nextItem?.extraNumber === num2,
-            isDuplicate: element.duplicateNumbers4555Index0.includes(num2),
+          const dữ_liệu_xuất_hiện: Loại_Dữ_Liệu_Xuât_Hiện = {
+            số_xuất_hiện: số2,
+            tổng_xuất_hiện: 1,
+            là_số_kết_quả: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.includes(số2) || false,
+            là_số_jackpot_2: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.số_jacpot_2 === số2,
+            là_số_trùng: dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau.includes(số2),
           }
-          element.appearListData.push(numberApear)
+          dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.push(dữ_liệu_xuất_hiện)
         }
       })
     }
   })
 
-  if (element2) {
-    element2.numberResult
-      .filter((num0) => !filterList.includes(num0))
-      .forEach((num: string) => {
-        const idx: number = Number(num) + i
-        const elementItem: LoteObject = listData[idx]
-        if (elementItem) {
-          element.listResult4555Index0.push(elementItem.numberResult)
-          elementItem.numberResult.forEach((num2: string) => {
-            element.setNumbersFromResult4555Index0.add(num2)
-            const findItem = element.appearListData.find((item) => item.number === num2)
-            if (findItem) {
-              findItem.total++
+  // xữ lý dữ liệu 2
+  if (dữ_liệu_2) {
+    dữ_liệu_2.kết_quả_xổ_số
+      .filter((số0) => !dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau.includes(số0))
+      .forEach((số1: string) => {
+        const vị_trí_từ_số_và_vị_trí_dữ_liệu: number = Number(số1) + vị_trí_dữ_liệu
+        const dữ_liệu_từ_vị_trí_mới: Đối_Tượng_Xổ_Số =
+          danh_sách_dữ_liệu[vị_trí_từ_số_và_vị_trí_dữ_liệu]
+        if (dữ_liệu_từ_vị_trí_mới) {
+          dữ_liệu_1.danh_sách_các_kết_quả_xổ_số_đã_xuất_hiện.push(
+            dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số,
+          )
+          dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số.forEach((số2: string) => {
+            dữ_liệu_1.tập_các_số_đã_xuất_hiện.add(số2)
+            const dữ_liệu_tìm_thấy = dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.find(
+              (mục) => mục.số_xuất_hiện === số2,
+            )
+            if (dữ_liệu_tìm_thấy) {
+              dữ_liệu_tìm_thấy.tổng_xuất_hiện++
             } else {
-              const numberApear: ApearType = {
-                number: num2,
-                total: 1,
-                isResult: element.nextItem?.numberResult.includes(num2) || false,
-                isResult2: element.nextItem?.extraNumber === num2,
-                isDuplicate: element.duplicateNumbers4555Index0.includes(num2),
+              const dữ_liệu_xuất_hiện: Loại_Dữ_Liệu_Xuât_Hiện = {
+                số_xuất_hiện: số2,
+                tổng_xuất_hiện: 1,
+                là_số_kết_quả: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.includes(số2) || false,
+                là_số_jackpot_2: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.số_jacpot_2 === số2,
+                là_số_trùng: dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau.includes(số2),
               }
-              element.appearListData.push(numberApear)
+              dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.push(dữ_liệu_xuất_hiện)
             }
           })
         }
       })
   }
+}
 
-  const sortTwoList = _.orderBy(element.appearListData, ['total'], ['asc'])
+khởi_tạo_hiển_thị()
 
-  for (let n = i; n < listData.length; n++) {
-    const nearlyElement = listData[n]
-    element.nearlyHowManyVersionFromIndex0 =
-      element.nearlyHowManyVersionFromIndex0
-        ? element.nearlyHowManyVersionFromIndex0 + 1
-        : 1
-    nearlyElement.numberResult.forEach((num: string) => {
-      if (!element.nearlySetNumbersFromIndex0.has(num)) {
-        element.nearlySetNumbersFromIndex0.add(num)
-      }
-    })
-    if (element.nearlySetNumbersFromIndex0.size >= element.loteType) {
-      break
-    }
-  }
-  if (element.nearlySetNumbersFromIndex0.size < element.loteType) {
-    element.nearlyHowManyVersionFromIndex0 = undefined
-  }
-
-  const numberSet = new Set<string>()
-  element.appearListData.forEach((item) => {
-    numberSet.add(item.number)
-  })
-  const appearO: ApearType[] = []
-  element.nearlySetNumbersFromIndex0.forEach((number: string) => {
-    if (numberSet.has(number)) {
-      return
-    }
-    const appear: ApearType = {
-      number,
-      total: 0,
-      isResult: element.nextItem?.numberResult.includes(number) || false,
-      isResult2: element.nextItem?.extraNumber === number,
-      isDuplicate: element.duplicateNumbers4555Index0.includes(number),
-    }
-    appearO.push(appear)
-  })
-  element.appearListTotal = [...appearO, ...sortTwoList]
-
-  element.nearlySetNumbersFromIndex0.forEach((number: string) => {
-    const findItem = element.appearListTotal.find((item) => item.number === number)
-    if (findItem) {
-      element.nearlyAppearList.push(findItem)
-    }
-  })
-  element.nearlyAppearList = _.orderBy(
-    element.nearlyAppearList,
-    ['total'],
-    ['asc'],
+function khởi_tạo_hiển_thị() {
+  các_tùy_chọn_để_hiển_thị_dữ_liệu.value = tạo_tùy_chọn_để_hiển_thị(
+    số_lượng_dữ_liệu_tối_đa_có_thể_hiển_thị,
   )
-
-  if (element.nextItem) {
-    const indexSorted: number[] = []
-    const mapNextResult =
-      element.nextItem?.numberResult.filter((num) =>
-        element.appearListTotal.some((item) => item.number === num),
-      ).length || 0
-    element.nextItem?.numberResult.forEach((num) => {
-      const index = element.appearListTotal.findIndex((item) => item.number === num)
-      const patternIndex = index % 6
-      if (index !== -1) {
-        indexSorted.push(index)
-        if (mapNextResult === 6) {
-          element.appearPatternListTotal[patternIndex]++
-        }
-      }
-    })
-    element.appearIndexListTotal = indexSorted
-    const sorted = [...indexSorted].sort((a, b) => a - b)
-    const distances = sorted.slice(1).map((val, i) => val - sorted[i])
-    element.appearSpacingListIndexTotal = distances
-  }
-
-  if (element.nextItem) {
-    const indexSorted: number[] = []
-    element.nextItem?.numberResult.forEach((num) => {
-      const index = element.nearlyAppearList.findIndex((item) => item.number === num)
-      if (index !== -1) {
-        indexSorted.push(index)
-      }
-    })
-    element.nearlyIndexAppearList = indexSorted
-    const sorted = [...indexSorted].sort((a, b) => a - b)
-    const distances = sorted.slice(1).map((val, i) => val - sorted[i])
-    element.nearlySpacingListIndex = distances
-  }
+  danh_sách_dữ_liệu_hiển_thị_45.value = dữ_liệu_xổ_số_45
+  danh_sách_dữ_liệu_hiển_thị_55.value = dữ_liệu_xổ_số_55
 }
 
-let resultMap = 0
-let filterTwoListSize = -1
-let filterDuplicateTwoListSize = -1
+khởi_tạo_in_nhật_ký()
 
-function handleDisplayResultMapping(event: Event) {
-  const target = event.target as HTMLSelectElement
-  const size = Number(target.value)
-  resultMap = size
-  handleFilterDisplayFeature()
-}
-function columnDisplayMany(event: Event) {
-  const target = event.target as HTMLSelectElement
-  const column = Number(target.value)
-  twoListColumn.value = column
-}
-function handleFilterNumbersApear(event: Event) {
-  const target = event.target as HTMLSelectElement
-  const size = Number(target.value)
-  filterTwoListSize = size
-  handleFilterDisplayFeature()
-}
-function handleFilterDuplicateResult(event: Event) {
-  const target = event.target as HTMLSelectElement
-  const size = Number(target.value)
-  filterDuplicateTwoListSize = size
-  handleFilterDisplayFeature()
-}
-function handleFilterDisplayFeature() {
-  let listData55Filter = listData55
-  let listData45Filter = listData45
-  if (filterTwoListSize !== -1) {
-    listData55Filter = listData55Filter.filter((item: LoteObject) => {
-      return item.setNumbersFromResult4555Index0.size === filterTwoListSize
-    })
-    listData45Filter = listData45Filter.filter((item: LoteObject) => {
-      return item.setNumbersFromResult4555Index0.size === filterTwoListSize
-    })
-  }
-  if (filterDuplicateTwoListSize !== -1) {
-    listData55Filter = listData55Filter.filter((item: LoteObject) => {
-      return item.duplicateNumbers4555Index0.length === filterDuplicateTwoListSize
-    })
-    listData45Filter = listData45Filter.filter((item: LoteObject) => {
-      return item.duplicateNumbers4555Index0.length === filterDuplicateTwoListSize
-    })
-  }
-  if (resultMap !== 0) {
-    listData55Filter = listData55Filter.filter((item: LoteObject) => {
-      return (
-        !item.nextItem?.numberResult ||
-        item.nextItem?.numberResult.filter((num) =>
-          item.setNumbersFromResult4555Index0.has(num),
-        ).length === resultMap
-      )
-    })
-    listData45Filter = listData45Filter.filter((item: LoteObject) => {
-      return (
-        !item.nextItem?.numberResult ||
-        item.nextItem?.numberResult.filter((num) =>
-          item.setNumbersFromResult4555Index0.has(num),
-        ).length === resultMap
-      )
-    })
-  }
-  if (filterWithWeek.value) {
-    listData55Filter = listData55Filter.filter(
-      (item: LoteObject) => item.weekOfDate === filterWithWeek.value,
-    )
-    listData45Filter = listData45Filter.filter(
-      (item: LoteObject) => item.weekOfDate === filterWithWeek.value,
-    )
-  }
-  listData55Render.value = listData55Filter
-  listData45Render.value = listData45Filter
-}
-
-function setFilterWith2ResultsCount6(
-  listData: Array<LoteObject>,
-  element: LoteObject,
-  i: number,
-) {
-  if (element.nextItem) {
-    const countNumber = new Set<string>()
-    const listApear = listData.filter((item, index) => {
-      if (index > i) {
-        return (
-          item.setNumbersFromResult4555Index0.size ===
-          element.setNumbersFromResult4555Index0.size
-        )
-      }
-    })
-    for (let j = 0; j < listApear.length; j++) {
-      const item = listApear[j]
-      element.spacingCount6InAppear = element.spacingCount6InAppear
-        ? element.spacingCount6InAppear + 1
-        : 1
-      if (countNumber.size <= 0) {
-        element.spacingCount1InAppear = element.spacingCount1InAppear
-          ? element.spacingCount1InAppear + 1
-          : 1
-      }
-      item.appearIndexListTotal.forEach((index: number) => {
-        const number = element.appearListTotal[index].number
-        if (element.nextItem?.numberResult.includes(number)) {
-          countNumber.add(number)
-        }
-      })
-      if (countNumber.size === 6) {
-        element.order6NumbersFromNextResult = [...countNumber]
-        break
-      }
-    }
-    if (countNumber.size <= 0) {
-      element.spacingCount1InAppear = undefined
-    }
-    if (countNumber.size < 6) {
-      element.spacingCount6InAppear = undefined
-    }
-  }
-}
-
-function runMainFeature(listData: Array<LoteObject>, offset: number = 0) {
-  const oppositeListData = listData[0].loteType === 45 ? listData55 : listData45
-  for (let i = 0; i < listData.length; i++) {
-    const element = listData[i]
-    const element2 = oppositeListData?.[i + offset]
-
-    handleDisplayFeature(listData, element, element2, i)
-
-    const total = element.setNumbersFromResult4555Index0.size || 0
-    if (total >= 30 && total <= 55) {
-      setFilterWith2Results.add(total)
-    }
-
-    const nextDate = new Date(element.nextTimestamp)
-    const date = nextDate.getDate()
-    const numberByNextDate = listData[date + i - 1]?.numberResult || []
-    element.numberByNextDate = numberByNextDate || []
-  }
-  for (let i = 0; i < listData.length; i++) {
-    const element = listData[i]
-    setFilterWith2ResultsCount6(listData, element, i)
-  }
-}
-
-function twoListResult(item: LoteObject) {
-  return (
-    item.nextItem?.numberResult.filter((num) =>
-      item.setNumbersFromResult4555Index0.has(num),
-    ).length || 0
-  )
-}
-
-function twoListResultStyle(item: LoteObject) {
-  const result = twoListResult(item)
-  if (result === 6) {
-    return { color: 'red' }
-  } else if (result === 5) {
-    return { color: 'orange' }
-  } else if (result === 4) {
-    return { color: 'yellow' }
-  } else {
-    return {}
-  }
-}
-
-function resultNumberStyle(item: ApearType) {
-  let style = {}
-  if (item.isDuplicate) {
-    style = { borderBottom: '1px solid lawngreen', ...style }
-  }
-  if (item.isResult) {
-    style = { color: 'red', ...style }
-  } else if (item.isResult2) {
-    style = { color: 'fuchsia', ...style }
-  }
-  return style
-}
-
-function isFilterByDate(number: string, item: LoteObject): boolean {
-  if (!hideNumbersFromDateToIndex.value) {
-    return true
-  }
-  return !item.numberByNextDate.includes(number)
-}
-
-function duplicateNumbers(item: LoteObject, i: number): string[] {
-  const data = item.loteType === 45 ? listData45 : listData55
-  const listDupplicate: string[] = []
-  item.duplicateNumbers4555Index0.forEach((num) => {
-    listDupplicate.push(
-      ...(data[Number(num) + i]?.numberResult ?? [])
-    )
-  })
-  return listDupplicate
-}
-
-function dupplicateWithNumber(item: LoteObject, i: number): string[] {
-  return item.nextItem?.numberResult.filter((num) => item.numbersFromResult4555Index0.includes(num)) || []
-}
-
-function isFilterDuplicateNumbers(number: string, item: LoteObject): boolean {
-  if (!hideDuplicateNumbers.value) {
-    return true
-  }
-  return !item.numbersFromResult4555Index0.includes(number)
+function khởi_tạo_in_nhật_ký() {
+  console.log('danh sách dữ liệu 45 đã qua xữ lý: ', dữ_liệu_xổ_số_45)
+  console.log('danh sách dữ liệu 55 đã qua xữ lý: ', dữ_liệu_xổ_số_55)
 }
 </script>
 
 <template>
-  <div class="content">
+  <div
+    :style="{ 'padding-left': '20px', display: 'flex', 'flex-direction': 'column', gap: '20px' }"
+  >
     <div>
-      <select v-model="totalSelected">
-        <option v-for="value in totalOptions" :key="value" :value="value">
-          {{ value }}
-        </option>
-      </select>
-    </div>
-    <div>Dự đoán cho: <span :style="{ color: 'greenyellow', fontSize: '18px' }">{{ predictionLoteType }}</span></div>
-    <div>Mở tính năng: <input v-model="isDisplayFeature" type="checkbox" /></div>
-  </div>
-  <template v-if="isDisplayFeature">
-    <template v-if="isDisplayFeature">
       <div>
-        <div>
-          Lọc ngày trong tuần:
-          <select v-model="filterWithWeek" :style="{ width: '100px', height: '24px' }"
-            @change="handleFilterDisplayFeature">
-            <option value="">Tất cả</option>
-            <option value="Tuesday">Thứ 3</option>
-            <option value="Wednesday">Thứ 4</option>
-            <option value="Thursday">Thứ 5</option>
-            <option value="Friday">Thứ 6</option>
-            <option value="Saturday">Thứ 7</option>
-            <option value="Sunday">Chủ nhật</option>
-          </select>
-        </div>
-        <div>
-          <span>
-            <input v-model="hideAppearIs0" type="checkbox" />
-            Ẩn các số có số lần xuất hiện là 0
-          </span>
-        </div>
-        <div>
-          <span>
-            <input v-model="hideNumbersFromDateToIndex" type="checkbox" /> Ẩn các số, lấy ngày làm chỉ mục,
-          </span>
-          <div :style="{ color: 'greenyellow' }">(ngày 24/07/2020 chỉ mục là 24, từ vị trí đó đếm tới 24 thì lấy kết
-            quả)</div>
-        </div>
-        <div>
-          <span>
-            <input v-model="hideDuplicateNumbers" type="checkbox" /> Ẩn các số bởi trùng
-          </span>
-        </div>
-        <div>
-          Số cột danh sách hiển thị:
-          <select v-model="twoListColumn" @change="columnDisplayMany" :style="{ width: '80px', height: '24px' }">
-            <option value="10">10 Cột</option>
-            <option value="9">9 Cột</option>
-            <option value="8">8 Cột</option>
-            <option value="7">7 Cột</option>
-            <option value="6">6 Cột</option>
-            <option value="5">5 Cột</option>
-            <option value="4">4 Cột</option>
-            <option value="3">3 Cột</option>
-            <option value="2">2 Cột</option>
-            <option value="1">1 Cột</option>
-          </select>
-        </div>
-        <div>Lọc dữ liệu hiển thị:</div>
-        <div>
-          <select @change="handleDisplayResultMapping" :style="{ width: '160px', height: '24px' }">
-            <option value="0">Số kết quả: tất cả</option>
-            <option value="5">Số kết quả: 5</option>
-            <option value="6">Số kết quả: 6</option>
-          </select>
-          <select v-model="filterWith2Result" :style="{ width: '150px', height: '24px' }">
-            <option value="two-list">2 danh sách 45 và 55</option>
-          </select>
-          <template v-if="filterWith2Result === 'two-list'">
-            <select @change="handleFilterNumbersApear" :style="{ width: '170px', height: '24px' }">
-              <option v-for="(option, index) in arrayFilterFor2Result" :value="option.value" :key="index">
-                Số lượng xuất hiện: {{ option.text }}
-              </option>
-            </select>
-            <select @change="handleFilterDuplicateResult" :style="{ width: '170px', height: '24px' }">
-              <option value="-1">Kết quả trùng: tất cả</option>
-              <option value="0">Kết quả trùng: 0</option>
-              <option value="1">Kết quả trùng: 1</option>
-              <option value="2">Kết quả trùng: 2</option>
-              <option value="3">Kết quả trùng: 3</option>
-            </select>
+        <select v-model="số_dữ_liệu_sẽ_được_hiển_thị">
+          <option
+            v-for="giá_trị in các_tùy_chọn_để_hiển_thị_dữ_liệu"
+            :key="giá_trị"
+            :value="giá_trị"
+          >
+            {{ giá_trị }}
+          </option>
+        </select>
+      </div>
+      <div>
+        Hôm nay dự đoán cho:
+        <span :style="{ color: 'greenyellow', fontSize: '18px' }">{{
+          mở_xổ_số_loại_tiếp_theo
+        }}</span>
+      </div>
+      <div>Hiển thị chi tiết: <input v-model="có_hiển_thị_chi_tiết" type="checkbox" /></div>
+    </div>
+
+    <div :style="{ display: 'flex', gap: '40px' }">
+      <div :style="{ width: '500px' }">
+        Tổng số dữ liệu 55: {{ danh_sách_dữ_liệu_hiển_thị_55?.length }}
+      </div>
+      <div :style="{ width: '500px' }">
+        Tổng số dữ liệu 45: {{ danh_sách_dữ_liệu_hiển_thị_45?.length }}
+      </div>
+    </div>
+
+    <div :style="{ display: 'flex', gap: '40px' }">
+      <!--
+        dành cho 55
+      -->
+
+      <div :style="{ width: '500px', display: 'flex', 'flex-direction': 'column', gap: '12px' }">
+        <div
+          v-for="(dữ_liệu, vị_trí) in danh_sách_dữ_liệu_hiển_thị_55?.slice(
+            0,
+            số_dữ_liệu_sẽ_được_hiển_thị,
+          )"
+          :key="`danh_sách_dữ_liệu-${vị_trí}`"
+          :style="{ height: có_hiển_thị_chi_tiết ? '740px' : 'auto' }"
+        >
+          <div :style="{ display: 'flex' }">
+            <div>{{ dữ_liệu.ngày_xổ_số }}::{{ dữ_liệu.tuần_xổ_số }}::{{ vị_trí }}::</div>
+            <div :style="{ color: 'cyan' }">{{ dữ_liệu.kết_quả_xổ_số }}</div>
+          </div>
+          <template v-if="có_hiển_thị_chi_tiết">
+            <div>---</div>
+            <div>Dự đoán bằng ngày xổ số: {{ dữ_liệu.danh_sách_dự_đoán_bằng_ngày_xổ_số }}</div>
+            <div>
+              Kết quả dự đoán bằng ngày xổ số: {{ dữ_liệu.kết_quả_dự_đoán_bằng_ngày_xổ_số }}
+            </div>
+
+            <div>---</div>
+            <div>Tổng trong ngày: {{ dữ_liệu.tổng_trong_ngày }}</div>
+            <div>
+              Dự đoán bằng tổng trong ngày: {{ dữ_liệu.danh_sách_dự_đoán_bẳng_tổng_trong_ngày }}
+            </div>
+            <div>
+              Kết quả dự đoán bằng tổng trong ngày:
+              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày }}
+            </div>
+
+            <div>---</div>
+            <div>Tổng ngày tháng: {{ dữ_liệu.tổng_ngày_tháng }}</div>
+            <div>
+              Dự đoán bằng tổng ngày tháng:
+              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_ngày_tháng }}
+            </div>
+            <div>
+              Kết quả dự đoán bằng tổng ngày tháng:
+              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_ngày_tháng }}
+            </div>
+            <div>---</div>
+            <div>Tổng trong ngày tháng: {{ dữ_liệu.tổng_trong_ngày_tháng }}</div>
+            <div>
+              Dự đoán bằng tổng trong ngày tháng:
+              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng }}
+            </div>
+            <div>
+              Kết quả dự đoán bằng tổng trong ngày tháng:
+              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng }}
+            </div>
+            <div>---</div>
+            <div>Tổng trong ngày tháng năm: {{ dữ_liệu.tổng_trong_ngày_tháng_năm }}</div>
+            <div>
+              Dự đoán bằng tổng trong ngày tháng năm:
+              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng_năm }}
+            </div>
+            <div>
+              Kết quả dự đoán bằng tổng trong ngày tháng năm:
+              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng_năm }}
+            </div>
+            <div>---</div>
+            <div>Kết quả trùng: {{ dữ_liệu.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau }}</div>
+            <div>
+              Dự đoán các số trùng:
+              {{ dữ_liệu.danh_sách_dự_đoán_các_số_trùng }}
+            </div>
+            <div>Kết quả dự đoán các số trùng: {{ dữ_liệu.kết_quả_dự_đoán_các_số_trùng }}</div>
+            <div>---</div>
+            <div>Sô kết quả có: {{ dữ_liệu.số_kết_quả_trong_các_số_đã_xuất_hiện }}</div>
+            <div>Số lượng xuất hiện: {{ dữ_liệu.tập_các_số_đã_xuất_hiện.size }}</div>
+            <div>Danh sách xuất hiện:</div>
+            <div :style="{ width: '220px', display: 'flex', 'flex-wrap': 'wrap' }">
+              <div
+                v-for="(
+                  dữ_liệu_xuất_hiện, vị_trí_xuất_hiện
+                ) in dữ_liệu.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện"
+                :key="`row-dữ_liệu_1${vị_trí}${vị_trí_xuất_hiện}`"
+                :style="{
+                  width: '34px',
+                }"
+              >
+                <span
+                  >{{ dữ_liệu_xuất_hiện.số_xuất_hiện }}:{{ dữ_liệu_xuất_hiện.tổng_xuất_hiện }}</span
+                >
+              </div>
+            </div>
           </template>
         </div>
       </div>
-    </template>
-  </template>
-  <div class="content">
-    <div>
-      <div>Total: {{ listData55Render?.length }}</div>
-      <div v-for="(item, index) in listData55Render?.slice(0, totalSelected)" :key="`listData-${index}`">
-        <div class="number d-flex">
-          <div :style="{ width: '200px' }">
-            {{ item.date }}::{{ item.weekOfDate }}::{{ index }}::
-          </div>
-          <div>{{ item.numberResult }}</div>
-        </div>
-        <template v-if="isDisplayFeature">
-          <div>
-            Sô kết quả:
-            <span :style="twoListResultStyle(item)">{{ twoListResult(item) }}</span>
-          </div>
-          <div>
-            Số lượng xuất hiện: {{ item.setNumbersFromResult4555Index0.size }}
-          </div>
-          <div>
-            Kết quả trùng: {{ item.duplicateNumbers4555Index0 }}
-            <template v-if="item.nextItem">
-              , Trùng với dự đoán: {{
-                dupplicateWithNumber(item, index)
-              }}
-            </template>
-          </div>
-          <div>
-            6 số xuất hiện gần nhất cách
-            <span :style="{ color: 'red' }">{{
-              item.nearlyHowManyVersionFromIndex0
-                ? item.nearlyHowManyVersionFromIndex0
-                : 'chưa có'
-            }}</span>
-            kỳ
-            <div :style="{ color: 'greenyellow' }">
-              (các số {{ item.numberResult }}
-              xuất hiện từ
-              <div>
-                {{ item.nearlyHowManyVersionFromIndex0
-                  ? item.nearlyHowManyVersionFromIndex0
-                  : 'chưa có' }}
-                kỳ trước đó)
-              </div>
-            </div>
-          </div>
-          <div>
-            Lọc với
-            <span :style="{ color: 'CadetBlue' }">{{
-              item.setNumbersFromResult4555Index0.size
-            }}</span>
-            số đầu tiên xuất hiện gần nhất cách
-            <span :style="{ color: 'red' }">{{
-              item.spacingCount1InAppear
-                ? item.spacingCount1InAppear
-                : 'chưa có'
-            }}</span>
-            <div :style="{ color: 'greenyellow' }">
-              (với danh sách có
-              {{ item.setNumbersFromResult4555Index0.size }}
-              xuất hiện thì 1 trong
-              <div>
-                các số {{ item.nextItem?.numberResult || [] }}
-              </div>
-              <div>
-                sẽ xuất hiện gần nhất cách
-                {{ item.spacingCount1InAppear
-                  ? item.spacingCount1InAppear
-                  : '"không xác định"' }}
-                kỳ trước đó)
-              </div>
-            </div>
-          </div>
-          <div>
-            Lọc với
-            <span :style="{ color: 'CadetBlue' }">{{
-              item.setNumbersFromResult4555Index0.size
-            }}</span>
-            6 số xuất hiện gần nhất cách
-            <span :style="{ color: 'red' }">{{
-              item.spacingCount6InAppear
-                ? item.spacingCount6InAppear
-                : 'chưa có'
-            }}</span>
-            <div :style="{ color: 'greenyellow' }">
-              (với danh sách có
-              {{ item.setNumbersFromResult4555Index0.size }}
-              xuất hiện thì
-              <div>các số {{ item.nextItem?.numberResult || [] }}</div>
-              <div>
-                sẽ xuất hiện gần nhất cách
-                {{ item.spacingCount6InAppear
-                  ? item.spacingCount6InAppear
-                  : '"không xác định"' }}
-                kỳ trước đó)
-              </div>
 
+      <!--
+        dành cho 45
+      -->
+
+      <div :style="{ width: '500px', display: 'flex', 'flex-direction': 'column', gap: '12px' }">
+        <div
+          v-for="(dữ_liệu, vị_trí) in danh_sách_dữ_liệu_hiển_thị_45?.slice(
+            0,
+            số_dữ_liệu_sẽ_được_hiển_thị,
+          )"
+          :key="`danh_sách_dữ_liệu-${vị_trí}`"
+          :style="{ height: có_hiển_thị_chi_tiết ? '740px' : 'auto' }"
+        >
+          <div :style="{ display: 'flex' }">
+            <div>{{ dữ_liệu.ngày_xổ_số }}::{{ dữ_liệu.tuần_xổ_số }}::{{ vị_trí }}::</div>
+            <div :style="{ color: 'cyan' }">{{ dữ_liệu.kết_quả_xổ_số }}</div>
+          </div>
+          <template v-if="có_hiển_thị_chi_tiết">
+            <div>---</div>
+            <div>Dự đoán bằng ngày xổ số: {{ dữ_liệu.danh_sách_dự_đoán_bằng_ngày_xổ_số }}</div>
+            <div>
+              Kết quả dự đoán bằng ngày xổ số: {{ dữ_liệu.kết_quả_dự_đoán_bằng_ngày_xổ_số }}
             </div>
-          </div>
-          <div>Danh sách xuất hiện:</div>
-          <div :style="{
-            maxWidth: 34 * twoListColumn + 'px',
-            flexWrap: 'wrap',
-          }" class="d-flex">
-            <template v-for="(numberTotal, indexNumberTotal) in item.appearListTotal">
-              <div :key="`row-element${index}${indexNumberTotal}`" :style="{
-                width: '34px',
-              }" v-if="
-                (numberTotal.total !== 0 || (numberTotal.total === 0 && !hideAppearIs0)) &&
-                isFilterByDate(numberTotal.number, item) && isFilterDuplicateNumbers(numberTotal.number, item)">
-                <span :style="resultNumberStyle(numberTotal)">{{ numberTotal.number }}:{{ numberTotal.total }}</span>
+            <div>---</div>
+            <div>Tổng trong ngày: {{ dữ_liệu.tổng_trong_ngày }}</div>
+            <div>
+              Dự đoán bằng tổng trong ngày: {{ dữ_liệu.danh_sách_dự_đoán_bẳng_tổng_trong_ngày }}
+            </div>
+            <div>
+              Kết quả dự đoán bằng tổng trong ngày:
+              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày }}
+            </div>
+            <div>---</div>
+            <div>Tổng ngày tháng: {{ dữ_liệu.tổng_ngày_tháng }}</div>
+            <div>
+              Dự đoán bằng tổng ngày tháng:
+              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_ngày_tháng }}
+            </div>
+            <div>
+              Kết quả dự đoán bằng tổng ngày tháng:
+              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_ngày_tháng }}
+            </div>
+            <div>---</div>
+            <div>Tổng trong ngày tháng: {{ dữ_liệu.tổng_trong_ngày_tháng }}</div>
+            <div>
+              Dự đoán bằng tổng trong ngày tháng:
+              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng }}
+            </div>
+            <div>
+              Kết quả dự đoán bằng tổng trong ngày tháng:
+              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng }}
+            </div>
+            <div>---</div>
+            <div>Tổng trong ngày tháng năm: {{ dữ_liệu.tổng_trong_ngày_tháng_năm }}</div>
+            <div>
+              Dự đoán bằng tổng trong ngày tháng năm:
+              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng_năm }}
+            </div>
+            <div>
+              Kết quả dự đoán bằng tổng trong ngày tháng năm:
+              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng_năm }}
+            </div>
+            <div>---</div>
+            <div>Kết quả trùng: {{ dữ_liệu.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau }}</div>
+            <div>
+              Dự đoán các số trùng:
+              {{ dữ_liệu.danh_sách_dự_đoán_các_số_trùng }}
+            </div>
+            <div>Kết quả dự đoán các số trùng: {{ dữ_liệu.kết_quả_dự_đoán_các_số_trùng }}</div>
+            <div>---</div>
+            <div>Sô kết quả có: {{ dữ_liệu.số_kết_quả_trong_các_số_đã_xuất_hiện }}</div>
+            <div>Số lượng xuất hiện: {{ dữ_liệu.tập_các_số_đã_xuất_hiện.size }}</div>
+            <div>Danh sách xuất hiện:</div>
+            <div :style="{ width: '220px', display: 'flex', 'flex-wrap': 'wrap' }">
+              <div
+                v-for="(
+                  dữ_liệu_xuất_hiện, vị_trí_xuất_hiện
+                ) in dữ_liệu.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện"
+                :key="`row-dữ_liệu_1${vị_trí}${vị_trí_xuất_hiện}`"
+                :style="{
+                  width: '34px',
+                }"
+              >
+                <span
+                  >{{ dữ_liệu_xuất_hiện.số_xuất_hiện }}:{{ dữ_liệu_xuất_hiện.tổng_xuất_hiện }}</span
+                >
               </div>
-            </template>
-          </div>
-        </template>
-      </div>
-    </div>
-    <div>
-      <div>Total: {{ listData45Render?.length }}</div>
-      <div v-for="(item, index) in listData45Render?.slice(0, totalSelected)" :key="`listData-${index}`">
-        <div class="number d-flex">
-          <div :style="{ width: '200px' }">
-            {{ item.date }}::{{ item.weekOfDate }}::{{ index }}::
-          </div>
-          <div>{{ item.numberResult }}</div>
+            </div>
+          </template>
         </div>
-        <template v-if="isDisplayFeature">
-          <div>
-            Sô kết quả:
-            <span :style="twoListResultStyle(item)">{{ twoListResult(item) }}</span>
-          </div>
-          <div>
-            Số lượng xuất hiện: {{ item.setNumbersFromResult4555Index0.size }}
-          </div>
-          <div>
-            Kết quả trùng: {{ item.duplicateNumbers4555Index0 }}
-            <template v-if="item.nextItem">
-              , Trùng với dự đoán: {{
-                dupplicateWithNumber(item, index)
-              }}
-            </template>
-          </div>
-          <div>
-            6 số xuất hiện gần nhất cách
-            <span :style="{ color: 'red' }">{{
-              item.nearlyHowManyVersionFromIndex0
-                ? item.nearlyHowManyVersionFromIndex0
-                : 'chưa có'
-            }}</span>
-            kỳ
-            <div :style="{ color: 'greenyellow' }">
-              ({{ item.numberResult }}
-              xuất hiện từ
-              {{ item.nearlyHowManyVersionFromIndex0
-                ? item.nearlyHowManyVersionFromIndex0
-                : 'chưa có' }}
-              kỳ trước đó)
-            </div>
-          </div>
-          <div>
-            Lọc với
-            <span :style="{ color: 'CadetBlue' }">{{
-              item.setNumbersFromResult4555Index0.size
-            }}</span>
-            số đầu tiên xuất hiện gần nhất cách
-            <span :style="{ color: 'red' }">{{
-              item.spacingCount1InAppear
-                ? item.spacingCount1InAppear
-                : 'chưa có'
-            }}</span>
-            <div :style="{ color: 'greenyellow' }">
-              (với danh sách có
-              {{ item.setNumbersFromResult4555Index0.size }}
-              xuất hiện thì 1 trong 6 số "dự đoán"
-              <div>
-                sẽ xuất hiện gần nhất cách
-                {{ item.spacingCount1InAppear
-                  ? item.spacingCount1InAppear
-                  : '"không xác định"' }}
-              </div>
-              kỳ trước đó)
-            </div>
-          </div>
-          <div>
-            Lọc với
-            <span :style="{ color: 'CadetBlue' }">{{
-              item.setNumbersFromResult4555Index0.size
-            }}</span>
-            6 số xuất hiện gần nhất cách
-            <span :style="{ color: 'red' }">{{
-              item.spacingCount6InAppear
-                ? item.spacingCount6InAppear
-                : 'chưa có'
-            }}</span>
-            <div :style="{ color: 'greenyellow' }">
-              (với danh sách có
-              {{ item.setNumbersFromResult4555Index0.size }}
-              xuất hiện thì 6 số "dự đoán"
-              <div>
-                sẽ xuất hiện gần nhất cách
-                {{ item.spacingCount6InAppear
-                  ? item.spacingCount6InAppear
-                  : '"không xác định"' }}
-              </div>
-              kỳ trước đó)
-            </div>
-          </div>
-          <div>Danh sách xuất hiện:</div>
-          <div :style="{
-            maxWidth: 34 * twoListColumn + 'px',
-            flexWrap: 'wrap',
-          }" class="d-flex value-color">
-            <template v-for="(numberTotal, indexNumberTotal) in item.appearListTotal">
-              <div :key="`row-element${index}${indexNumberTotal}`" :style="{
-                width: '34px',
-              }" v-if="
-                (numberTotal.total !== 0 || (numberTotal.total === 0 && !hideAppearIs0)) &&
-                isFilterByDate(numberTotal.number, item) && isFilterDuplicateNumbers(numberTotal.number, item)">
-                <span :style="resultNumberStyle(numberTotal)">{{ numberTotal.number }}:{{ numberTotal.total }}</span>
-              </div>
-            </template>
-          </div>
-        </template>
       </div>
     </div>
   </div>
 </template>
+
 <style lang="css">
 body {
-  background: linear-gradient(to right, #1F1C18, #8E0E00);
-  color: #CCFF00;
-}
-
-.content {
-  display: flex;
-  gap: 12px;
-}
-
-.number {
-  color: coral;
-}
-
-.d-flex {
-  display: flex;
-  align-items: center;
+  background: linear-gradient(to right, #1f1c18, #8e0e00);
+  color: white;
 }
 </style>

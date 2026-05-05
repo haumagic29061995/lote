@@ -1,4 +1,4 @@
-export const generateOptions = (maxLength: number) => {
+export const tạo_tùy_chọn_để_hiển_thị = (maxLength: number) => {
   const options: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
   for (let i = 10; i <= 100; i += 3) {
     if (i <= maxLength) {
@@ -16,22 +16,6 @@ export const generateOptions = (maxLength: number) => {
   return options
 }
 
-export const sortNestedArray = (arr: number[][]): number[][] => {
-  return arr.sort((a, b) => {
-    // So sánh từng phần tử từ trái sang phải
-    for (let i = 0; i < 6; i++) {
-      if (a[i] !== b[i]) {
-        return a[i] - b[i]
-      }
-    }
-    return 0 // Tất cả phần tử giống nhau
-  })
-}
-/**
- * Tìm các giá trị xuất hiện ở tất cả các ma trận
- * @param matrices - Mảng các ma trận
- * @returns Set các giá trị xuất hiện ở tất cả ma trận
- */
 export const findCommonValues = (matrices: string[][]): Set<string> => {
   if (matrices.length === 0) {
     return new Set<string>()
@@ -60,26 +44,29 @@ export const findCommonValues = (matrices: string[][]): Set<string> => {
 }
 
 // Lịch quay số:
-// Lote 45: Thứ 4 (3), Thứ 6 (5), Chủ nhật (0)
-// Lote 55: Thứ 3 (2), Thứ 5 (4), Thứ 7 (6)
-const LOTE_SCHEDULE: Record<45 | 55, number[]> = {
-  45: [3, 5, 0], // Wednesday, Friday, Sunday
-  55: [2, 4, 6], // Tuesday, Thursday, Saturday
+// loại 45: Thứ 4 (3), Thứ 6 (5), Chủ nhật (0)
+// loại 55: Thứ 3 (2), Thứ 5 (4), Thứ 7 (6)
+const LICH_XO_SO: Record<45 | 55, number[]> = {
+  45: [3, 5, 0], // Thứ 4, Thứ 6, Chủ nhật
+  55: [2, 4, 6], // Thứ 3, Thứ 5, Thứ 7
 }
 
-export const getNextLoteTimestamp = (timestamp: number, loteType: 45 | 55): number => {
-  const date = new Date(timestamp)
-  const currentDay = date.getDay()
-  const validDays = LOTE_SCHEDULE[loteType]
+export const lấy_dấu_thời_gian_của_kỳ_sau = (
+  dấu_thời_gian_của_ngày: number,
+  loại_xổ_số: 45 | 55,
+): number => {
+  const ngày_xổ_số = new Date(dấu_thời_gian_của_ngày)
+  const ngay_hien_tai = ngày_xổ_số.getDay()
+  const lich_xo_so = LICH_XO_SO[loại_xổ_số]
 
   for (let offset = 1; offset <= 7; offset++) {
-    const nextDay = (currentDay + offset) % 7
-    if (validDays.includes(nextDay)) {
-      const nextDate = new Date(date)
-      nextDate.setDate(date.getDate() + offset)
+    const kỳ_quay_tiếp_theo = (ngay_hien_tai + offset) % 7
+    if (lich_xo_so.includes(kỳ_quay_tiếp_theo)) {
+      const nextDate = new Date(ngày_xổ_số)
+      nextDate.setDate(ngày_xổ_số.getDate() + offset)
       return nextDate.getTime()
     }
   }
 
-  return timestamp
+  return dấu_thời_gian_của_ngày
 }

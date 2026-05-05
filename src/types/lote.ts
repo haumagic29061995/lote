@@ -1,96 +1,83 @@
-interface Lote {
-  loteType: number
-  dataIndex: number
-  date: string
-  numberResult: string[]
-  extraNumber: string
-  version: string
-  weekOfDate: string
-  day: string
-  month: string
-  year: string
-  timestamp: number
-  nextTimestamp: number
-  nextItem?: LoteObject
+interface Dữ_Liệu_1_Đối_Tượng {
+  loại_xổ_số: number
+  vị_trí_dữ_liệu: number
+  ngày_xổ_số: string
+  kết_quả_xổ_số: string[]
+  số_jacpot_2: string
+  kỳ_xổ_số: string
+  tuần_xổ_số: string
+  giá_trị_ngày: string
+  giá_trị_tháng: string
+  giá_trị_năm: string
+  dấu_thời_gian_của_ngày: number
+  dấu_thời_gian_kỳ_sau_đó: number
+  dữ_liệu_kỳ_sau_đó?: Đối_Tượng_Xổ_Số
 }
 
-export type ApearType = {
-  number: string
-  total: number
-  isResult: boolean
-  isResult2: boolean
-  isDuplicate?: boolean
+export type Loại_Dữ_Liệu_Xuât_Hiện = {
+  số_xuất_hiện: string
+  tổng_xuất_hiện: number
+  là_số_kết_quả: boolean
+  là_số_jackpot_2: boolean
+  là_số_trùng?: boolean
 }
 
-export type ApearRepeat = {
-  number: string
-  total: number
-  maxRepeat: number
-}
+export class Đối_Tượng_Xổ_Số {
+  loại_xổ_số: number
+  vị_trí_dữ_liệu: number
+  ngày_xổ_số: string
+  kết_quả_xổ_số: string[]
+  số_jacpot_2: string
+  kỳ_xổ_số: string
+  tuần_xổ_số: string
+  giá_trị_ngày: string
+  giá_trị_tháng: string
+  giá_trị_năm: string
+  dấu_thời_gian_của_ngày: number
+  dấu_thời_gian_kỳ_sau_đó: number
+  dữ_liệu_kỳ_sau_đó?: Đối_Tượng_Xổ_Số
 
-export class LoteObject {
-  loteType: number
-  dataIndex: number
-  date: string
-  numberResult: string[]
-  extraNumber: string
-  version: string
-  weekOfDate: string
-  day: string
-  month: string
-  year: string
-  timestamp: number
-  nextTimestamp: number
-  nextItem?: LoteObject
+  danh_sách_dự_đoán_bằng_ngày_xổ_số: string[] = []
+  kết_quả_dự_đoán_bằng_ngày_xổ_số: number = 0
 
-  duplicateNumbers4555Index0: string[] = []
-  numbersFromResult4555Index0: string[] = []
+  tổng_trong_ngày: number = 0
+  danh_sách_dự_đoán_bẳng_tổng_trong_ngày: string[] = []
+  kết_quả_dự_đoán_bằng_tổng_trong_ngày: number = 0
 
-  listResult4555Index0: string[][] = []
+  tổng_ngày_tháng: number = 0
+  danh_sách_dự_đoán_bằng_tổng_ngày_tháng: string[] = []
+  kết_quả_dự_đoán_bằng_tổng_ngày_tháng: number = 0
 
-  setNumbersFromResult4555Index0 = new Set<string>()
+  tổng_trong_ngày_tháng: number = 0
+  danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng: string[] = []
+  kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng: number = 0
 
-  appearListData: Array<ApearType> = []
+  tổng_trong_ngày_tháng_năm: number = 0
+  danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng_năm: string[] = []
+  kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng_năm: number = 0
 
-  nearlySetNumbersFromIndex0 = new Set<string>()
+  các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau: string[] = []
+  danh_sách_dự_đoán_các_số_trùng: string[] = []
+  kết_quả_dự_đoán_các_số_trùng: number = 0
 
-  nearlyHowManyVersionFromIndex0?: number = undefined
+  danh_sách_các_kết_quả_xổ_số_đã_xuất_hiện: string[][] = []
+  danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện: Array<Loại_Dữ_Liệu_Xuât_Hiện> = []
+  số_kết_quả_trong_các_số_đã_xuất_hiện: number = 0
+  tập_các_số_đã_xuất_hiện = new Set<string>()
 
-  nearlyAppearList: Array<ApearType> = []
-
-  nearlyIndexAppearList: number[] = []
-
-  nearlySpacingListIndex: number[] = []
-
-  appearListTotal: Array<ApearType> = []
-
-  appearIndexListTotal: number[] = []
-
-  appearSpacingListIndexTotal: number[] = []
-
-  appearPatternListTotal: number[] = Array(6).fill(0)
-
-  spacingCount6InAppear?: number = undefined
-
-  spacingCount1InAppear?: number = undefined
-
-  order6NumbersFromNextResult: string[] = []
-
-  numberByNextDate: string[] = []
-
-  constructor(lote: Lote) {
-    this.loteType = lote.loteType
-    this.dataIndex = lote.dataIndex
-    this.date = lote.date
-    this.numberResult = lote.numberResult
-    this.extraNumber = lote.extraNumber
-    this.version = lote.version
-    this.weekOfDate = lote.weekOfDate
-    this.day = lote.day
-    this.month = lote.month
-    this.year = lote.year
-    this.timestamp = lote.timestamp
-    this.nextTimestamp = lote.nextTimestamp
-    this.nextItem = lote.nextItem
+  constructor(đối_tượng: Dữ_Liệu_1_Đối_Tượng) {
+    this.loại_xổ_số = đối_tượng.loại_xổ_số
+    this.vị_trí_dữ_liệu = đối_tượng.vị_trí_dữ_liệu
+    this.ngày_xổ_số = đối_tượng.ngày_xổ_số
+    this.kết_quả_xổ_số = đối_tượng.kết_quả_xổ_số
+    this.số_jacpot_2 = đối_tượng.số_jacpot_2
+    this.kỳ_xổ_số = đối_tượng.kỳ_xổ_số
+    this.tuần_xổ_số = đối_tượng.tuần_xổ_số
+    this.giá_trị_ngày = đối_tượng.giá_trị_ngày
+    this.giá_trị_tháng = đối_tượng.giá_trị_tháng
+    this.giá_trị_năm = đối_tượng.giá_trị_năm
+    this.dấu_thời_gian_của_ngày = đối_tượng.dấu_thời_gian_của_ngày
+    this.dấu_thời_gian_kỳ_sau_đó = đối_tượng.dấu_thời_gian_kỳ_sau_đó
+    this.dữ_liệu_kỳ_sau_đó = đối_tượng.dữ_liệu_kỳ_sau_đó
   }
 }
