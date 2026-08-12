@@ -16,33 +16,6 @@ export const tạo_tùy_chọn_để_hiển_thị = (maxLength: number) => {
   return options
 }
 
-export const findCommonValues = (matrices: string[][]): Set<string> => {
-  if (matrices.length === 0) {
-    return new Set<string>()
-  }
-
-  if (matrices.length === 1) {
-    return new Set<string>(matrices[0])
-  }
-
-  // Tạo Set cho ma trận đầu tiên
-  const commonSet = new Set<string>(matrices[0])
-
-  // Duyệt qua các ma trận còn lại
-  for (let i = 1; i < matrices.length; i++) {
-    const currentMatrixSet = new Set<string>(matrices[i])
-
-    // Giữ lại chỉ những giá trị xuất hiện ở cả 2
-    for (let value of commonSet) {
-      if (!currentMatrixSet.has(value)) {
-        commonSet.delete(value)
-      }
-    }
-  }
-
-  return commonSet
-}
-
 // Lịch quay số:
 // loại 45: Thứ 4 (3), Thứ 6 (5), Chủ nhật (0)
 // loại 55: Thứ 3 (2), Thứ 5 (4), Thứ 7 (6)
@@ -69,4 +42,45 @@ export const lấy_dấu_thời_gian_của_kỳ_sau = (
   }
 
   return dấu_thời_gian_của_ngày
+}
+
+export const lấy_dấu_thời_gian_của_các_kỳ_tiếp_theo = (
+  dấu_thời_gian_của_ngày: number,
+  loại_xổ_số: 45 | 55,
+  số_kỳ: number = 6,
+): number[] => {
+  const kết_quả: number[] = []
+  let dấu_thời_gian_hiện_tại = dấu_thời_gian_của_ngày
+
+  for (let i = 0; i < số_kỳ; i++) {
+    dấu_thời_gian_hiện_tại = lấy_dấu_thời_gian_của_kỳ_sau(dấu_thời_gian_hiện_tại, loại_xổ_số)
+    kết_quả.push(dấu_thời_gian_hiện_tại)
+  }
+
+  return kết_quả
+}
+
+export function lọc_các_số_giống_nhau_cùng_1_cột(ma_trận: string[][]): string[][] {
+  if (ma_trận.length === 0 || ma_trận[0].length === 0) return []
+
+  const số_dòng_ma_trận = ma_trận.length
+  const số_cột_ma_trận = ma_trận[0].length
+
+  const kết_quả_ma_trận: string[][] = Array.from({ length: số_dòng_ma_trận }, () =>
+    Array(số_cột_ma_trận).fill(''),
+  )
+
+  for (let cột = 0; cột < số_cột_ma_trận; cột++) {
+    const cột_đã_có_số_đó = new Set<string>()
+
+    for (let dòng = 0; dòng < số_dòng_ma_trận; dòng++) {
+      const số = ma_trận[dòng][cột]
+      if (!cột_đã_có_số_đó.has(số)) {
+        cột_đã_có_số_đó.add(số)
+        kết_quả_ma_trận[dòng][cột] = số
+      }
+    }
+  }
+
+  return kết_quả_ma_trận
 }

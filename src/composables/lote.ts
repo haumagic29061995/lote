@@ -1,11 +1,12 @@
 import moment from 'moment'
+import _ from 'lodash'
 
 import csv_dữ_liệu_55 from '@/assets/csv/lote55.csv?raw'
 import csv_dữ_liệu_45 from '@/assets/csv/lote45.csv?raw'
 
-import { Đối_Tượng_Xổ_Số } from '@/types/lote'
+import { Đối_Tượng_Xổ_Số, type Dữ_Liệu_Xuât_Hiện } from '@/types/lote'
 
-import { lấy_dấu_thời_gian_của_kỳ_sau } from '@/utils'
+import { lấy_dấu_thời_gian_của_các_kỳ_tiếp_theo } from '@/utils'
 
 export function lấy_dữ_liệu_xổ_số_45(): Array<Đối_Tượng_Xổ_Số> {
   const loại_xổ_số = 45
@@ -31,7 +32,7 @@ export function lấy_dữ_liệu_xổ_số_45(): Array<Đối_Tượng_Xổ_S�
 
     const dữ_liệu_kỳ_sau_đó: Đối_Tượng_Xổ_Số | undefined = dữ_liệu[dữ_liệu.length - 1]
     const vị_trí_dữ_liệu: number = dữ_liệu.length
-    const dấu_thời_gian_kỳ_sau_đó: number = lấy_dấu_thời_gian_của_kỳ_sau(
+    const dấu_thời_gian_kỳ_sau_đó: number[] = lấy_dấu_thời_gian_của_các_kỳ_tiếp_theo(
       dấu_thời_gian_của_ngày,
       loại_xổ_số,
     )
@@ -82,7 +83,7 @@ export function lấy_dữ_liệu_xổ_số_55(): Array<Đối_Tượng_Xổ_S�
     const dấu_thời_gian_của_ngày = moment(ngày_xổ_số_việt_nam, 'DD/MM/YYYY').valueOf()
 
     const dữ_liệu_kỳ_sau_đó: Đối_Tượng_Xổ_Số | undefined = dữ_liệu[dữ_liệu.length - 1]
-    const dấu_thời_gian_kỳ_sau_đó: number = lấy_dấu_thời_gian_của_kỳ_sau(
+    const dấu_thời_gian_kỳ_sau_đó: number[] = lấy_dấu_thời_gian_của_các_kỳ_tiếp_theo(
       dấu_thời_gian_của_ngày,
       loại_xổ_số,
     )
@@ -107,4 +108,45 @@ export function lấy_dữ_liệu_xổ_số_55(): Array<Đối_Tượng_Xổ_S�
     dữ_liệu.push(đối_tượng)
   }
   return dữ_liệu
+}
+
+export const tạo_ds_xuất_hiện = (
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  danh_sách_dữ_liệu_khác: Array<Đối_Tượng_Xổ_Số>,
+  đối_tượng: Đối_Tượng_Xổ_Số,
+  vị_trí: number,
+  bao_nhiêu_xuất_hiện: number = 46,
+  bù_trừ_vị_trí: number = 0,
+): string[][] => {
+  const kết_quả_xuất_hiện: string[][] = []
+  const danh_sách_vị_trí_chính: number[] = đối_tượng.kết_quả_xổ_số.map((số) => Number(số))
+  for (let i = vị_trí + 1; i < danh_sách_dữ_liệu.length; i++) {
+    const danh_sách_xuất_hiện: Dữ_Liệu_Xuât_Hiện[] = []
+
+    const danh_sách_vị_trí_phụ: number[] =
+      danh_sách_dữ_liệu_khác[i]?.kết_quả_xổ_số.map((số) => Number(số)) || []
+    const danh_sách_vị_trí = [...danh_sách_vị_trí_chính, ...danh_sách_vị_trí_phụ]
+
+    danh_sách_vị_trí.forEach((vị_trí_số) => {
+      const kết_quả_xổ_số = danh_sách_dữ_liệu[vị_trí_số - bù_trừ_vị_trí]?.kết_quả_xổ_số || []
+      kết_quả_xổ_số.forEach((số) => {
+        const xuất_hiện = danh_sách_xuất_hiện.find((x) => x.số_xuất_hiện === số)
+        if (xuất_hiện) {
+          xuất_hiện.tổng_xuất_hiện += 1
+        } else {
+          danh_sách_xuất_hiện.push({
+            số_xuất_hiện: số,
+            tổng_xuất_hiện: 1,
+          })
+        }
+      })
+    })
+    if (danh_sách_xuất_hiện.length === bao_nhiêu_xuất_hiện) {
+      const kết_quả = _.sortBy(danh_sách_xuất_hiện, ['tổng_xuất_hiện'], ['asc']).map(
+        (x) => x.số_xuất_hiện,
+      )
+      kết_quả_xuất_hiện.push(kết_quả)
+    }
+  }
+  return kết_quả_xuất_hiện
 }

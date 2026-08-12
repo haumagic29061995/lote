@@ -10,8 +10,13 @@ interface Dữ_Liệu_1_Đối_Tượng {
   giá_trị_tháng: string
   giá_trị_năm: string
   dấu_thời_gian_của_ngày: number
-  dấu_thời_gian_kỳ_sau_đó: number
+  dấu_thời_gian_kỳ_sau_đó: number[]
   dữ_liệu_kỳ_sau_đó?: Đối_Tượng_Xổ_Số
+}
+
+export type Dữ_Liệu_Xuât_Hiện = {
+  số_xuất_hiện: string
+  tổng_xuất_hiện: number
 }
 
 export type Loại_Dữ_Liệu_Xuât_Hiện = {
@@ -34,36 +39,21 @@ export class Đối_Tượng_Xổ_Số {
   giá_trị_tháng: string
   giá_trị_năm: string
   dấu_thời_gian_của_ngày: number
-  dấu_thời_gian_kỳ_sau_đó: number
+  dấu_thời_gian_kỳ_sau_đó: number[]
   dữ_liệu_kỳ_sau_đó?: Đối_Tượng_Xổ_Số
 
-  danh_sách_dự_đoán_bằng_ngày_xổ_số: string[] = []
-  kết_quả_dự_đoán_bằng_ngày_xổ_số: number = 0
-
-  tổng_trong_ngày: number = 0
-  danh_sách_dự_đoán_bẳng_tổng_trong_ngày: string[] = []
-  kết_quả_dự_đoán_bằng_tổng_trong_ngày: number = 0
-
-  tổng_ngày_tháng: number = 0
-  danh_sách_dự_đoán_bằng_tổng_ngày_tháng: string[] = []
-  kết_quả_dự_đoán_bằng_tổng_ngày_tháng: number = 0
-
-  tổng_trong_ngày_tháng: number = 0
-  danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng: string[] = []
-  kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng: number = 0
-
-  tổng_trong_ngày_tháng_năm: number = 0
-  danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng_năm: string[] = []
-  kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng_năm: number = 0
-
+  // Hiển thị chi tiết
   các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau: string[] = []
-  danh_sách_dự_đoán_các_số_trùng: string[] = []
-  kết_quả_dự_đoán_các_số_trùng: number = 0
-
   danh_sách_các_kết_quả_xổ_số_đã_xuất_hiện: string[][] = []
   danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện: Array<Loại_Dữ_Liệu_Xuât_Hiện> = []
   số_kết_quả_trong_các_số_đã_xuất_hiện: number = 0
   tập_các_số_đã_xuất_hiện = new Set<string>()
+
+  // Tạo DS xuất hiện
+  dự_đoán_ds_xuất_hiện: string[][] = []
+  hiển_thị_dự_đoán_ds_xuất_hiện: boolean = false
+  vị_trí_ds_xuất_hiện: number[][] = []
+  xem_dự_đoán: string = ''
 
   constructor(đối_tượng: Dữ_Liệu_1_Đối_Tượng) {
     this.loại_xổ_số = đối_tượng.loại_xổ_số

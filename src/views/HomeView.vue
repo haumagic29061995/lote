@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import _ from 'lodash'
-import { ref } from 'vue'
+import { ref, h } from 'vue'
 import moment from 'moment'
 
-import { lấy_dữ_liệu_xổ_số_45, lấy_dữ_liệu_xổ_số_55 } from '@/composables/lote'
+import { lấy_dữ_liệu_xổ_số_45, lấy_dữ_liệu_xổ_số_55, tạo_ds_xuất_hiện } from '@/composables/lote'
 
 import { Đối_Tượng_Xổ_Số, type Loại_Dữ_Liệu_Xuât_Hiện } from '@/types/lote'
 
 import { tạo_tùy_chọn_để_hiển_thị } from '@/utils'
+
+const màu_kết_quả_dự_đoán = ref<boolean>(true)
+const màu_kết_quả_hiện_tại = ref<boolean>(true)
 
 //
 // các biến không dùng ràng buộc hiển thị
@@ -45,7 +47,7 @@ const danh_sách_dữ_liệu_hiển_thị_55 = ref<Array<Đối_Tượng_Xổ_S�
 chạy_chức_năng_chính(dữ_liệu_xổ_số_45, bù_trừ_cho_loại_xổ_số_45)
 chạy_chức_năng_chính(dữ_liệu_xổ_số_55, bù_trừ_cho_loại_xổ_số_55)
 
-function chạy_chức_năng_chính(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>, offset: number = 0) {
+async function chạy_chức_năng_chính(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>, offset: number = 0) {
   const danh_sách_dữ_liệu_45_hoặc_55 =
     danh_sách_dữ_liệu[0].loại_xổ_số === 45 ? dữ_liệu_xổ_số_55 : dữ_liệu_xổ_số_45
 
@@ -53,176 +55,18 @@ function chạy_chức_năng_chính(danh_sách_dữ_liệu: Array<Đối_Tượn
     const dữ_liệu_1 = danh_sách_dữ_liệu[vị_trí_dữ_liệu]
     const dữ_liệu_2 = danh_sách_dữ_liệu_45_hoặc_55?.[vị_trí_dữ_liệu + offset]
 
-    // dự đoán bằng ngày xổ số
-    dữ_đoán_bằng_ngày_xổ_số(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
-
-    // dự đoán bằng tổng ngày
-    dự_đoán_bằng_tổng_ngày(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
-
-    // dự đoán bằng tổng ngày tháng
-    dự_đoán_bằng_tổng_ngày_tháng(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
-
-    // dự đoán bằng tổng trong ngày tháng
-    dự_đoán_bằng_tổng_trong_ngày_tháng(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
-
-    // dự đoán bằng tổng trong ngày tháng năm
-    dự_đoán_kết_quả_bằng_tổng_ngày_tháng_năm(dữ_liệu_1, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
-
-    // dự đoán bàng các số trùng
-    dự_đoán_bằng_vị_trí_của_các_số_trùng(dữ_liệu_1, dữ_liệu_2, danh_sách_dữ_liệu, vị_trí_dữ_liệu)
-
     // xữ lý dữ liệu xuất hiện
     xữ_lý_dữ_liệu_xuất_hiện(danh_sách_dữ_liệu, dữ_liệu_1, dữ_liệu_2, vị_trí_dữ_liệu)
-    dữ_liệu_1.số_kết_quả_trong_các_số_đã_xuất_hiện =
-      dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((num) =>
-        dữ_liệu_1.tập_các_số_đã_xuất_hiện.has(num),
-      ).length || 0
-  }
-}
 
-function dữ_đoán_bằng_ngày_xổ_số(
-  dữ_liệu: Đối_Tượng_Xổ_Số,
-  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
-  vị_trí_dữ_liệu: number,
-) {
-  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
-  const ngày_xổ_số = ngày_xổ_số_tiếp_theo.getDate()
-  const danh_sách_dự_đoán = danh_sách_dữ_liệu[ngày_xổ_số + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
-  const kết_quả_dư_đoán =
-    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
-      danh_sách_dự_đoán.includes(số_dự_đoán),
-    ).length || 0
-
-  dữ_liệu.danh_sách_dự_đoán_bằng_ngày_xổ_số = danh_sách_dự_đoán
-  dữ_liệu.kết_quả_dự_đoán_bằng_ngày_xổ_số = kết_quả_dư_đoán
-}
-
-function dự_đoán_bằng_tổng_ngày(
-  dữ_liệu: Đối_Tượng_Xổ_Số,
-  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
-  vị_trí_dữ_liệu: number,
-) {
-  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
-  const tổng_ngày = ngày_xổ_số_tiếp_theo
-    .getDate()
-    .toString()
-    .split('')
-    .reduce((tổng, số) => tổng + Number(số), 0)
-  const danh_sách_dự_đoán = danh_sách_dữ_liệu[tổng_ngày + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
-  const kết_quả_dư_đoán =
-    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
-      danh_sách_dự_đoán.includes(số_dự_đoán),
-    ).length || 0
-
-  dữ_liệu.tổng_trong_ngày = tổng_ngày
-  dữ_liệu.danh_sách_dự_đoán_bẳng_tổng_trong_ngày = danh_sách_dự_đoán
-  dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày = kết_quả_dư_đoán
-}
-
-function dự_đoán_bằng_tổng_ngày_tháng(
-  dữ_liệu: Đối_Tượng_Xổ_Số,
-  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
-  vị_trí_dữ_liệu: number,
-) {
-  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
-  const tổng_ngày_tháng = ngày_xổ_số_tiếp_theo.getDate() + (ngày_xổ_số_tiếp_theo.getMonth() + 1)
-  const danh_sách_dự_đoán =
-    danh_sách_dữ_liệu[tổng_ngày_tháng + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
-  const kết_quả_dư_đoán =
-    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
-      danh_sách_dự_đoán.includes(số_dự_đoán),
-    ).length || 0
-
-  dữ_liệu.tổng_ngày_tháng = tổng_ngày_tháng
-  dữ_liệu.danh_sách_dự_đoán_bằng_tổng_ngày_tháng = danh_sách_dự_đoán
-  dữ_liệu.kết_quả_dự_đoán_bằng_tổng_ngày_tháng = kết_quả_dư_đoán
-}
-
-function dự_đoán_bằng_tổng_trong_ngày_tháng(
-  dữ_liệu: Đối_Tượng_Xổ_Số,
-  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
-  vị_trí_dữ_liệu: number,
-) {
-  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
-  const tổng_trong_ngày_tháng =
-    ngày_xổ_số_tiếp_theo
-      .getDate()
-      .toString()
-      .split('')
-      .reduce((tổng, số) => tổng + Number(số), 0) +
-    (ngày_xổ_số_tiếp_theo.getMonth() + 1)
-      .toString()
-      .split('')
-      .reduce((tổng, số) => tổng + Number(số), 0)
-  const danh_sách_dự_đoán =
-    danh_sách_dữ_liệu[tổng_trong_ngày_tháng + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
-  const kết_quả_dư_đoán =
-    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
-      danh_sách_dự_đoán.includes(số_dự_đoán),
-    ).length || 0
-
-  dữ_liệu.tổng_trong_ngày_tháng = tổng_trong_ngày_tháng
-  dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng = danh_sách_dự_đoán
-  dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng = kết_quả_dư_đoán
-}
-
-function dự_đoán_kết_quả_bằng_tổng_ngày_tháng_năm(
-  dữ_liệu: Đối_Tượng_Xổ_Số,
-  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
-  vị_trí_dữ_liệu: number,
-) {
-  const ngày_xổ_số_tiếp_theo = new Date(dữ_liệu.dấu_thời_gian_kỳ_sau_đó)
-  const tổng_trong_ngày_tháng_năm =
-    ngày_xổ_số_tiếp_theo
-      .getDate()
-      .toString()
-      .split('')
-      .reduce((tổng, số) => tổng + Number(số), 0) +
-    (ngày_xổ_số_tiếp_theo.getMonth() + 1)
-      .toString()
-      .split('')
-      .reduce((tổng, số) => tổng + Number(số), 0) +
-    ngày_xổ_số_tiếp_theo
-      .getFullYear()
-      .toString()
-      .split('')
-      .reduce((tổng, số) => tổng + Number(số), 0)
-  const danh_sách_dự_đoán =
-    danh_sách_dữ_liệu[tổng_trong_ngày_tháng_năm + vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
-  const kết_quả_dư_đoán =
-    dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((số_dự_đoán) =>
-      danh_sách_dự_đoán.includes(số_dự_đoán),
-    ).length || 0
-
-  dữ_liệu.tổng_trong_ngày_tháng_năm = tổng_trong_ngày_tháng_năm
-  dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng_năm = danh_sách_dự_đoán
-  dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng_năm = kết_quả_dư_đoán
-}
-
-function dự_đoán_bằng_vị_trí_của_các_số_trùng(
-  dữ_liệu_1: Đối_Tượng_Xổ_Số,
-  dữ_liệu_2: Đối_Tượng_Xổ_Số,
-  dữ_liệu_xổ_số: Array<Đối_Tượng_Xổ_Số>,
-  vị_trí_dữ_liệu: number,
-) {
-  const danh_sách_các_số_trùng: string[] = dữ_liệu_1.kết_quả_xổ_số.filter((số) =>
-    dữ_liệu_2?.kết_quả_xổ_số.includes(số),
-  )
-  const tập_các_số_trùng: Set<string> = new Set()
-  danh_sách_các_số_trùng.forEach((số) => {
-    const số_từ_vị_trí = dữ_liệu_xổ_số[Number(số) + vị_trí_dữ_liệu]?.kết_quả_xổ_số
-    if (số_từ_vị_trí) {
-      số_từ_vị_trí.forEach((số2) => tập_các_số_trùng.add(số2))
+    if (dữ_liệu_1.loại_xổ_số !== 0) {
+      tạo_ds_xuất_hiện_tại_vị_trí_chỉ_định(
+        danh_sách_dữ_liệu,
+        dữ_liệu_xổ_số_55,
+        dữ_liệu_1,
+        vị_trí_dữ_liệu,
+      )
     }
-  })
-  const danh_sách_dự_đoán = Array.from(tập_các_số_trùng)
-  const kết_quả_dự_đoán = danh_sách_dự_đoán.filter((số) =>
-    dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.includes(số),
-  ).length
-
-  dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau = danh_sách_các_số_trùng
-  dữ_liệu_1.danh_sách_dự_đoán_các_số_trùng = danh_sách_dự_đoán
-  dữ_liệu_1.kết_quả_dự_đoán_các_số_trùng = kết_quả_dự_đoán
+  }
 }
 
 function xữ_lý_dữ_liệu_xuất_hiện(
@@ -291,6 +135,12 @@ function xữ_lý_dữ_liệu_xuất_hiện(
         }
       })
   }
+
+  // Số kết quả
+  dữ_liệu_1.số_kết_quả_trong_các_số_đã_xuất_hiện =
+    dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((num) =>
+      dữ_liệu_1.tập_các_số_đã_xuất_hiện.has(num),
+    ).length || 0
 }
 
 khởi_tạo_hiển_thị()
@@ -309,23 +159,208 @@ function khởi_tạo_in_nhật_ký() {
   console.log('danh sách dữ liệu 45 đã qua xữ lý: ', dữ_liệu_xổ_số_45)
   console.log('danh sách dữ liệu 55 đã qua xữ lý: ', dữ_liệu_xổ_số_55)
 }
+
+function hiển_thị_danh_sách_xuất_hiện(dữ_liệu: Đối_Tượng_Xổ_Số, vị_trí: number) {
+  return h(
+    'div',
+    { style: { width: '220px', display: 'flex', flexWrap: 'wrap' } },
+    dữ_liệu.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.map((dữ_liệu_xuất_hiện, vị_trí_xuất_hiện) =>
+      h(
+        'div',
+        { key: `row-dữ_liệu_1${vị_trí}${vị_trí_xuất_hiện}`, style: { width: '34px' } },
+        h(
+          'span',
+          {
+            style: {
+              opacity: dữ_liệu_xuất_hiện.tổng_xuất_hiện <= 3 ? 1 : 0.3,
+              border:
+                màu_kết_quả_hiện_tại.value &&
+                dữ_liệu.kết_quả_xổ_số.includes(dữ_liệu_xuất_hiện.số_xuất_hiện)
+                  ? '1px solid blue'
+                  : null,
+              color: dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.includes(
+                dữ_liệu_xuất_hiện.số_xuất_hiện,
+              )
+                ? 'red'
+                : null,
+            },
+          },
+          `${dữ_liệu_xuất_hiện.số_xuất_hiện}:${dữ_liệu_xuất_hiện.tổng_xuất_hiện}`,
+        ),
+      ),
+    ),
+  )
+}
+
+function hiển_thị_ds_dự_đoán_xuất_hiện(danh_sách: string[], dữ_liệu: Đối_Tượng_Xổ_Số) {
+  const kết_quả_sau_đó = dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số || []
+  const kết_quả_hiện_tại = dữ_liệu.kết_quả_xổ_số || []
+  return h(
+    'div',
+    { style: { width: '220px', display: 'flex', flexWrap: 'wrap' } },
+    danh_sách.map((số_dự_đoán, vị_trí) =>
+      h(
+        'div',
+        { key: `row-dự_đoán${vị_trí}`, style: { width: '34px' } },
+        h(
+          'span',
+          {
+            style: {
+              color: kết_quả_sau_đó.includes(số_dự_đoán) ? 'red' : null,
+              border: kết_quả_hiện_tại.includes(số_dự_đoán) ? '1px solid blue' : null,
+            },
+          },
+          `${số_dự_đoán}`,
+        ),
+      ),
+    ),
+  )
+}
+
+function tạo_ds_xuất_hiện_tại_vị_trí_chỉ_định(
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  danh_sách_dữ_liệu_khác: Array<Đối_Tượng_Xổ_Số>,
+  dữ_liệu: Đối_Tượng_Xổ_Số,
+  vị_trí_dữ_liệu: number,
+) {
+  dữ_liệu.dự_đoán_ds_xuất_hiện = tạo_ds_xuất_hiện(
+    danh_sách_dữ_liệu,
+    danh_sách_dữ_liệu_khác,
+    dữ_liệu,
+    vị_trí_dữ_liệu,
+    dữ_liệu.loại_xổ_số === 55 ? 46 : 41,
+    bù_trừ_cho_loại_xổ_số_55,
+  )
+  if (vị_trí_dữ_liệu > 0) {
+    const kết_quả_sau_đó = danh_sách_dữ_liệu[vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
+    dữ_liệu.dự_đoán_ds_xuất_hiện.forEach((danh_sách, vị_trí_ds) => {
+      const ds_vị_trí =
+        kết_quả_sau_đó.map((số) => {
+          {
+            const vị_Trí = danh_sách.indexOf(số) || -1
+            if (vị_Trí >= 0) {
+              return vị_Trí
+            } else {
+              for (let i = 0; i < dữ_liệu.dự_đoán_ds_xuất_hiện.length; i++) {
+                if (i !== vị_trí_ds) {
+                  const vị_trí_tìm_thấy = dữ_liệu.dự_đoán_ds_xuất_hiện[i].indexOf(số)
+                  if (vị_trí_tìm_thấy >= 0) {
+                    return vị_trí_tìm_thấy
+                  }
+                }
+              }
+            }
+            return -1
+          }
+        }) || []
+      dữ_liệu.vị_trí_ds_xuất_hiện.push(ds_vị_trí)
+    })
+  }
+}
+
+function xem_dự_đoán_cho_tất_cả(
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  dữ_liệu: Đối_Tượng_Xổ_Số,
+  vị_trí_xem: number = -1,
+) {
+  console.group('Dự Đoán')
+  if (vị_trí_xem === -1) {
+    console.log('dự đoán cho tất cả')
+  } else {
+    console.log(`dự đoán cho vị trí ${vị_trí_xem}`)
+  }
+
+  const kết_quả_xổ_số = dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số || []
+  const dự_đoán_ds_xuất_hiện = dữ_liệu.dự_đoán_ds_xuất_hiện
+  const tất_cả_ds_vị_trí_dự_đoán: number[][] = []
+
+  // lấy tất cả vị trí dự đoán
+  for (let i = dữ_liệu.vị_trí_dữ_liệu + 1; i < danh_sách_dữ_liệu.length; i++) {
+    const dữ_liệu_tiếp_theo = danh_sách_dữ_liệu[i]
+    tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu_tiếp_theo.vị_trí_ds_xuất_hiện)
+  }
+
+  console.log('tất cả vị trí dự đoán: ', tất_cả_ds_vị_trí_dự_đoán.length)
+
+  let tong_3 = 0
+  let tong_4 = 0
+  let tong_5 = 0
+  let tong5_5 = 0
+  let tong_6 = 0
+  let tổng_ds = 0
+
+  for (let i = 0; i < dự_đoán_ds_xuất_hiện.length; i++) {
+    if (vị_trí_xem === i || vị_trí_xem === -1) {
+      const danh_sách = dự_đoán_ds_xuất_hiện[i]
+      for (let j = 0; j < tất_cả_ds_vị_trí_dự_đoán.length; j++) {
+        const ds_dự_đoán: string[] = []
+        const ds_vị_trí = tất_cả_ds_vị_trí_dự_đoán[j]
+        ds_vị_trí.forEach((vị_trí) => {
+          ds_dự_đoán.push(danh_sách[vị_trí])
+        })
+        const tổng = ds_dự_đoán.filter((số) => kết_quả_xổ_số.includes(số)).length
+        tổng_ds++
+        if (tổng === 3) {
+          tong_3++
+        }
+        if (tổng === 4) {
+          tong_4++
+        }
+        if (tổng === 5) {
+          if (ds_dự_đoán.includes(dữ_liệu.số_jacpot_2)) {
+            console.log('trúng jackpot 2 tại: ', `ds ${i} vị trí ${j}`)
+            tong5_5++
+          } else {
+            console.log('trúng 5 tại: ', `ds ${i} vị trí ${j}`)
+            tong_5++
+          }
+        }
+        if (tổng === 6) {
+          console.log('trúng jackpot 1 tại: ', `ds ${i} vị trí ${j}`)
+          tong_6++
+        }
+      }
+    }
+  }
+
+  const formatter = new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+  })
+  console.log(kết_quả_xổ_số.join(', '))
+  console.log(
+    `tiền: ${formatter.format(tổng_ds * 10000)}, tổng: ${tổng_ds}, tong_3: ${tong_3}, tong_4: ${tong_4}, tong_5: ${tong_5}, jackpot_2: ${tong5_5}, jackpot_1: ${tong_6}`,
+  )
+  console.groupEnd()
+}
 </script>
 
 <template>
   <div
-    :style="{ 'padding-left': '20px', display: 'flex', 'flex-direction': 'column', gap: '20px' }"
+    :style="{
+      'padding-left': '20px',
+      display: 'flex',
+      'flex-direction': 'column',
+      gap: '20px',
+      position: 'relative',
+      'z-index': '1',
+    }"
   >
-    <div>
-      <div>
-        <select v-model="số_dữ_liệu_sẽ_được_hiển_thị">
-          <option
-            v-for="giá_trị in các_tùy_chọn_để_hiển_thị_dữ_liệu"
-            :key="giá_trị"
-            :value="giá_trị"
-          >
-            {{ giá_trị }}
-          </option>
-        </select>
+    <div
+      :style="{ position: 'sticky', top: '0px', background: '#0a0a1a', padding: '4px', zIndex: 1 }"
+    >
+      <div :style="{ display: 'flex', gap: '20px', 'align-items': 'center' }">
+        <div>
+          <select v-model="số_dữ_liệu_sẽ_được_hiển_thị">
+            <option
+              v-for="giá_trị in các_tùy_chọn_để_hiển_thị_dữ_liệu"
+              :key="giá_trị"
+              :value="giá_trị"
+            >
+              {{ giá_trị }}
+            </option>
+          </select>
+        </div>
       </div>
       <div>
         Hôm nay dự đoán cho:
@@ -333,14 +368,26 @@ function khởi_tạo_in_nhật_ký() {
           mở_xổ_số_loại_tiếp_theo
         }}</span>
       </div>
+      <div>
+        <div :style="{ display: 'flex', 'align-items': 'center' }">
+          <div :style="{ background: 'red', width: '10px', height: '10px' }"></div>
+          Kết quả dự đoán
+          <input v-model="màu_kết_quả_dự_đoán" type="checkbox" />
+        </div>
+        <div :style="{ display: 'flex', 'align-items': 'center' }">
+          <div :style="{ background: 'blue', width: '10px', height: '10px' }"></div>
+          Kết quả hiện tại
+          <input v-model="màu_kết_quả_hiện_tại" type="checkbox" />
+        </div>
+      </div>
       <div>Hiển thị chi tiết: <input v-model="có_hiển_thị_chi_tiết" type="checkbox" /></div>
     </div>
 
     <div :style="{ display: 'flex', gap: '40px' }">
-      <div :style="{ width: '500px' }">
+      <div :style="{ width: '700px' }">
         Tổng số dữ liệu 55: {{ danh_sách_dữ_liệu_hiển_thị_55?.length }}
       </div>
-      <div :style="{ width: '500px' }">
+      <div :style="{ width: '700px' }">
         Tổng số dữ liệu 45: {{ danh_sách_dữ_liệu_hiển_thị_45?.length }}
       </div>
     </div>
@@ -350,90 +397,51 @@ function khởi_tạo_in_nhật_ký() {
         dành cho 55
       -->
 
-      <div :style="{ width: '500px', display: 'flex', 'flex-direction': 'column', gap: '12px' }">
+      <div :style="{ width: '700px', display: 'flex', 'flex-direction': 'column', gap: '12px' }">
         <div
           v-for="(dữ_liệu, vị_trí) in danh_sách_dữ_liệu_hiển_thị_55?.slice(
             0,
             số_dữ_liệu_sẽ_được_hiển_thị,
           )"
           :key="`danh_sách_dữ_liệu-${vị_trí}`"
-          :style="{ height: có_hiển_thị_chi_tiết ? '740px' : 'auto' }"
+          :style="{ height: 'auto' }"
         >
           <div :style="{ display: 'flex' }">
             <div>{{ dữ_liệu.ngày_xổ_số }}::{{ dữ_liệu.tuần_xổ_số }}::{{ vị_trí }}::</div>
             <div :style="{ color: 'cyan' }">{{ dữ_liệu.kết_quả_xổ_số }}</div>
           </div>
           <template v-if="có_hiển_thị_chi_tiết">
-            <div>---</div>
-            <div>Dự đoán bằng ngày xổ số: {{ dữ_liệu.danh_sách_dự_đoán_bằng_ngày_xổ_số }}</div>
-            <div>
-              Kết quả dự đoán bằng ngày xổ số: {{ dữ_liệu.kết_quả_dự_đoán_bằng_ngày_xổ_số }}
-            </div>
-
-            <div>---</div>
-            <div>Tổng trong ngày: {{ dữ_liệu.tổng_trong_ngày }}</div>
-            <div>
-              Dự đoán bằng tổng trong ngày: {{ dữ_liệu.danh_sách_dự_đoán_bẳng_tổng_trong_ngày }}
-            </div>
-            <div>
-              Kết quả dự đoán bằng tổng trong ngày:
-              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày }}
-            </div>
-
-            <div>---</div>
-            <div>Tổng ngày tháng: {{ dữ_liệu.tổng_ngày_tháng }}</div>
-            <div>
-              Dự đoán bằng tổng ngày tháng:
-              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_ngày_tháng }}
-            </div>
-            <div>
-              Kết quả dự đoán bằng tổng ngày tháng:
-              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_ngày_tháng }}
-            </div>
-            <div>---</div>
-            <div>Tổng trong ngày tháng: {{ dữ_liệu.tổng_trong_ngày_tháng }}</div>
-            <div>
-              Dự đoán bằng tổng trong ngày tháng:
-              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng }}
-            </div>
-            <div>
-              Kết quả dự đoán bằng tổng trong ngày tháng:
-              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng }}
-            </div>
-            <div>---</div>
-            <div>Tổng trong ngày tháng năm: {{ dữ_liệu.tổng_trong_ngày_tháng_năm }}</div>
-            <div>
-              Dự đoán bằng tổng trong ngày tháng năm:
-              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng_năm }}
-            </div>
-            <div>
-              Kết quả dự đoán bằng tổng trong ngày tháng năm:
-              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng_năm }}
-            </div>
-            <div>---</div>
-            <div>Kết quả trùng: {{ dữ_liệu.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau }}</div>
-            <div>
-              Dự đoán các số trùng:
-              {{ dữ_liệu.danh_sách_dự_đoán_các_số_trùng }}
-            </div>
-            <div>Kết quả dự đoán các số trùng: {{ dữ_liệu.kết_quả_dự_đoán_các_số_trùng }}</div>
-            <div>---</div>
-            <div>Sô kết quả có: {{ dữ_liệu.số_kết_quả_trong_các_số_đã_xuất_hiện }}</div>
+            <div>Số kết quả có: {{ dữ_liệu.số_kết_quả_trong_các_số_đã_xuất_hiện }}</div>
             <div>Số lượng xuất hiện: {{ dữ_liệu.tập_các_số_đã_xuất_hiện.size }}</div>
             <div>Danh sách xuất hiện:</div>
-            <div :style="{ width: '220px', display: 'flex', 'flex-wrap': 'wrap' }">
-              <div
-                v-for="(
-                  dữ_liệu_xuất_hiện, vị_trí_xuất_hiện
-                ) in dữ_liệu.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện"
-                :key="`row-dữ_liệu_1${vị_trí}${vị_trí_xuất_hiện}`"
-                :style="{
-                  width: '34px',
-                }"
+            <component :is="() => hiển_thị_danh_sách_xuất_hiện(dữ_liệu, vị_trí)" />
+            <div>
+              <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_55, dữ_liệu)">
+                xem dự đoán
+              </button>
+              <button
+                @click="
+                  dữ_liệu.hiển_thị_dự_đoán_ds_xuất_hiện = !dữ_liệu.hiển_thị_dự_đoán_ds_xuất_hiện
+                "
               >
-                <span
-                  >{{ dữ_liệu_xuất_hiện.số_xuất_hiện }}:{{ dữ_liệu_xuất_hiện.tổng_xuất_hiện }}</span
-                >
+                xem danh sách
+              </button>
+              {{ dữ_liệu.dự_đoán_ds_xuất_hiện.length }}
+            </div>
+            <div
+              v-if="
+                dữ_liệu.dự_đoán_ds_xuất_hiện.length > 0 && dữ_liệu.hiển_thị_dự_đoán_ds_xuất_hiện
+              "
+              :style="{ display: 'flex', flexDirection: 'column', gap: '12px' }"
+            >
+              <div v-for="(ds, vị_trí_xh) in dữ_liệu.dự_đoán_ds_xuất_hiện" :key="`${vị_trí_xh}ds`">
+                <div>
+                  {{ vị_trí_xh
+                  }}<component :is="() => hiển_thị_ds_dự_đoán_xuất_hiện(ds, dữ_liệu)" />
+                </div>
+                <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_55, dữ_liệu, vị_trí_xh)">
+                  xem dự đoán
+                </button>
               </div>
             </div>
           </template>
@@ -444,88 +452,51 @@ function khởi_tạo_in_nhật_ký() {
         dành cho 45
       -->
 
-      <div :style="{ width: '500px', display: 'flex', 'flex-direction': 'column', gap: '12px' }">
+      <div :style="{ width: '700px', display: 'flex', 'flex-direction': 'column', gap: '12px' }">
         <div
           v-for="(dữ_liệu, vị_trí) in danh_sách_dữ_liệu_hiển_thị_45?.slice(
             0,
             số_dữ_liệu_sẽ_được_hiển_thị,
           )"
           :key="`danh_sách_dữ_liệu-${vị_trí}`"
-          :style="{ height: có_hiển_thị_chi_tiết ? '740px' : 'auto' }"
+          :style="{ height: 'auto' }"
         >
           <div :style="{ display: 'flex' }">
             <div>{{ dữ_liệu.ngày_xổ_số }}::{{ dữ_liệu.tuần_xổ_số }}::{{ vị_trí }}::</div>
             <div :style="{ color: 'cyan' }">{{ dữ_liệu.kết_quả_xổ_số }}</div>
           </div>
           <template v-if="có_hiển_thị_chi_tiết">
-            <div>---</div>
-            <div>Dự đoán bằng ngày xổ số: {{ dữ_liệu.danh_sách_dự_đoán_bằng_ngày_xổ_số }}</div>
-            <div>
-              Kết quả dự đoán bằng ngày xổ số: {{ dữ_liệu.kết_quả_dự_đoán_bằng_ngày_xổ_số }}
-            </div>
-            <div>---</div>
-            <div>Tổng trong ngày: {{ dữ_liệu.tổng_trong_ngày }}</div>
-            <div>
-              Dự đoán bằng tổng trong ngày: {{ dữ_liệu.danh_sách_dự_đoán_bẳng_tổng_trong_ngày }}
-            </div>
-            <div>
-              Kết quả dự đoán bằng tổng trong ngày:
-              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày }}
-            </div>
-            <div>---</div>
-            <div>Tổng ngày tháng: {{ dữ_liệu.tổng_ngày_tháng }}</div>
-            <div>
-              Dự đoán bằng tổng ngày tháng:
-              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_ngày_tháng }}
-            </div>
-            <div>
-              Kết quả dự đoán bằng tổng ngày tháng:
-              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_ngày_tháng }}
-            </div>
-            <div>---</div>
-            <div>Tổng trong ngày tháng: {{ dữ_liệu.tổng_trong_ngày_tháng }}</div>
-            <div>
-              Dự đoán bằng tổng trong ngày tháng:
-              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng }}
-            </div>
-            <div>
-              Kết quả dự đoán bằng tổng trong ngày tháng:
-              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng }}
-            </div>
-            <div>---</div>
-            <div>Tổng trong ngày tháng năm: {{ dữ_liệu.tổng_trong_ngày_tháng_năm }}</div>
-            <div>
-              Dự đoán bằng tổng trong ngày tháng năm:
-              {{ dữ_liệu.danh_sách_dự_đoán_bằng_tổng_trong_ngày_tháng_năm }}
-            </div>
-            <div>
-              Kết quả dự đoán bằng tổng trong ngày tháng năm:
-              {{ dữ_liệu.kết_quả_dự_đoán_bằng_tổng_trong_ngày_tháng_năm }}
-            </div>
-            <div>---</div>
-            <div>Kết quả trùng: {{ dữ_liệu.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau }}</div>
-            <div>
-              Dự đoán các số trùng:
-              {{ dữ_liệu.danh_sách_dự_đoán_các_số_trùng }}
-            </div>
-            <div>Kết quả dự đoán các số trùng: {{ dữ_liệu.kết_quả_dự_đoán_các_số_trùng }}</div>
-            <div>---</div>
-            <div>Sô kết quả có: {{ dữ_liệu.số_kết_quả_trong_các_số_đã_xuất_hiện }}</div>
+            <div>Số kết quả có: {{ dữ_liệu.số_kết_quả_trong_các_số_đã_xuất_hiện }}</div>
             <div>Số lượng xuất hiện: {{ dữ_liệu.tập_các_số_đã_xuất_hiện.size }}</div>
             <div>Danh sách xuất hiện:</div>
-            <div :style="{ width: '220px', display: 'flex', 'flex-wrap': 'wrap' }">
-              <div
-                v-for="(
-                  dữ_liệu_xuất_hiện, vị_trí_xuất_hiện
-                ) in dữ_liệu.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện"
-                :key="`row-dữ_liệu_1${vị_trí}${vị_trí_xuất_hiện}`"
-                :style="{
-                  width: '34px',
-                }"
+            <component :is="() => hiển_thị_danh_sách_xuất_hiện(dữ_liệu, vị_trí)" />
+            <div>
+              <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_55, dữ_liệu)">
+                xem dự đoán
+              </button>
+              <button
+                @click="
+                  dữ_liệu.hiển_thị_dự_đoán_ds_xuất_hiện = !dữ_liệu.hiển_thị_dự_đoán_ds_xuất_hiện
+                "
               >
-                <span
-                  >{{ dữ_liệu_xuất_hiện.số_xuất_hiện }}:{{ dữ_liệu_xuất_hiện.tổng_xuất_hiện }}</span
-                >
+                xem danh sách
+              </button>
+              {{ dữ_liệu.dự_đoán_ds_xuất_hiện.length }}
+            </div>
+            <div
+              v-if="
+                dữ_liệu.dự_đoán_ds_xuất_hiện.length > 0 && dữ_liệu.hiển_thị_dự_đoán_ds_xuất_hiện
+              "
+              :style="{ display: 'flex', flexDirection: 'column', gap: '12px' }"
+            >
+              <div v-for="(ds, vị_trí_xh) in dữ_liệu.dự_đoán_ds_xuất_hiện" :key="`${vị_trí_xh}ds`">
+                <div>
+                  {{ vị_trí_xh
+                  }}<component :is="() => hiển_thị_ds_dự_đoán_xuất_hiện(ds, dữ_liệu)" />
+                </div>
+                <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_55, dữ_liệu, vị_trí_xh)">
+                  xem dự đoán
+                </button>
               </div>
             </div>
           </template>
@@ -537,7 +508,9 @@ function khởi_tạo_in_nhật_ký() {
 
 <style lang="css">
 body {
-  background: linear-gradient(to right, #1f1c18, #8e0e00);
+  background: radial-gradient(ellipse at center, #0a0a1a 0%, #000000 100%);
   color: white;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 </style>
