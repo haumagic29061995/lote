@@ -116,19 +116,20 @@ export const tạo_ds_xuất_hiện = (
   đối_tượng: Đối_Tượng_Xổ_Số,
   vị_trí: number,
   bao_nhiêu_xuất_hiện: number = 46,
-  bù_trừ_vị_trí: number = 0,
 ): string[][] => {
   const kết_quả_xuất_hiện: string[][] = []
-  const danh_sách_vị_trí_chính: number[] = đối_tượng.kết_quả_xổ_số.map((số) => Number(số))
-  for (let i = vị_trí + 1; i < danh_sách_dữ_liệu.length; i++) {
-    const danh_sách_xuất_hiện: Dữ_Liệu_Xuât_Hiện[] = []
 
+  const danh_sách_vị_trí_chính: number[] = đối_tượng.kết_quả_xổ_số.map((số) => vị_trí + Number(số))
+
+  for (let i = vị_trí; i < danh_sách_dữ_liệu.length; i++) {
+    const danh_sách_xuất_hiện: Dữ_Liệu_Xuât_Hiện[] = []
     const danh_sách_vị_trí_phụ: number[] =
-      danh_sách_dữ_liệu_khác[i]?.kết_quả_xổ_số.map((số) => Number(số)) || []
+      danh_sách_dữ_liệu_khác[i]?.kết_quả_xổ_số.map((số) => vị_trí + Number(số)) || []
+
     const danh_sách_vị_trí = [...danh_sách_vị_trí_chính, ...danh_sách_vị_trí_phụ]
 
     danh_sách_vị_trí.forEach((vị_trí_số) => {
-      const kết_quả_xổ_số = danh_sách_dữ_liệu[vị_trí_số - bù_trừ_vị_trí]?.kết_quả_xổ_số || []
+      const kết_quả_xổ_số = danh_sách_dữ_liệu[vị_trí_số]?.kết_quả_xổ_số || []
       kết_quả_xổ_số.forEach((số) => {
         const xuất_hiện = danh_sách_xuất_hiện.find((x) => x.số_xuất_hiện === số)
         if (xuất_hiện) {
@@ -141,6 +142,7 @@ export const tạo_ds_xuất_hiện = (
         }
       })
     })
+
     if (danh_sách_xuất_hiện.length === bao_nhiêu_xuất_hiện) {
       const kết_quả = _.sortBy(danh_sách_xuất_hiện, ['tổng_xuất_hiện'], ['asc']).map(
         (x) => x.số_xuất_hiện,
