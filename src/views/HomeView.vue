@@ -4,6 +4,8 @@ import moment from 'moment'
 
 import { lấy_dữ_liệu_xổ_số_45, lấy_dữ_liệu_xổ_số_55, tạo_ds_xuất_hiện } from '@/composables/lote'
 
+import { dịch_vụ_indexeddb, type Vị_Trí_Lặp_Lại } from '@/composables/indexeddb-service'
+
 import { Đối_Tượng_Xổ_Số, type Loại_Dữ_Liệu_Xuât_Hiện } from '@/types/lote'
 
 import { tạo_tùy_chọn_để_hiển_thị } from '@/utils'
@@ -11,6 +13,8 @@ import _ from 'lodash'
 
 const màu_kết_quả_dự_đoán = ref<boolean>(true)
 const màu_kết_quả_hiện_tại = ref<boolean>(true)
+
+const LOTE_55_HẰNG_SỐ = 'lote_55'
 
 //
 // các biến không dùng ràng buộc hiển thị
@@ -37,6 +41,15 @@ const các_tùy_chọn_để_hiển_thị_dữ_liệu = ref<number[]>([])
 const số_dữ_liệu_sẽ_được_hiển_thị = ref<number>(7)
 
 const có_hiển_thị_chi_tiết = ref<boolean>(false)
+
+const vị_trí_phân_tích = ref<number>(1)
+const vị_trí_dự_đoán = ref<number>(2)
+const danh_sách_dự_đoán = ref<number>(0)
+
+const vị_trí_xem_số_lần_xuất_hiện = ref<number>(0)
+const số_xuất_hiện_nhiều_lần = ref<number>(4)
+const từ_vị_trí_số_xuất_hiện_nhiều_lần = ref<number>(1)
+const chu_kỳ_số_xuất_hiện_nhiều_lần = ref<number>(10)
 
 const danh_sách_dữ_liệu_hiển_thị_45 = ref<Array<Đối_Tượng_Xổ_Số>>()
 const danh_sách_dữ_liệu_hiển_thị_55 = ref<Array<Đối_Tượng_Xổ_Số>>()
@@ -279,8 +292,8 @@ function xem_dự_đoán_cho_tất_cả(
   const tất_cả_ds_vị_trí_dự_đoán: number[][] = []
 
   // lấy tất cả vị trí dự đoán
-  for (let i = dữ_liệu.vị_trí_dữ_liệu + 1; i < danh_sách_dữ_liệu.length; i++) {
-    const dữ_liệu_tiếp_theo = danh_sách_dữ_liệu[i]
+  for (let k = dữ_liệu.vị_trí_dữ_liệu + 1; k < danh_sách_dữ_liệu.length; k++) {
+    const dữ_liệu_tiếp_theo = danh_sách_dữ_liệu[k]
     tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu_tiếp_theo.vị_trí_ds_xuất_hiện)
   }
 
@@ -292,7 +305,6 @@ function xem_dự_đoán_cho_tất_cả(
   let tong5_5 = 0
   let tong_6 = 0
   let tổng_ds = 0
-
   for (let i = 0; i < dự_đoán_ds_xuất_hiện.length; i++) {
     if (vị_trí_xem === i || vị_trí_xem === -1) {
       const danh_sách = dự_đoán_ds_xuất_hiện[i]
@@ -339,89 +351,18 @@ function xem_dự_đoán_cho_tất_cả(
   console.groupEnd()
 }
 
-function xem_dự_đoán_cho_tất_cả_vị_trí(
-  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
-  dữ_liệu: Đối_Tượng_Xổ_Số,
-  vị_trí_xem: number = -1,
-) {
-  console.group('Dự Đoán')
-  if (vị_trí_xem === -1) {
-    console.log('dự đoán cho tất cả')
-  } else {
-    console.log(`dự đoán cho vị trí ${vị_trí_xem}`)
-  }
-
-  const kết_quả_xổ_số = dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số || []
-  const tất_cả_ds_vị_trí_dự_đoán: number[][] = []
-
-  // lấy tất cả vị trí dự đoán
-  for (let i = dữ_liệu.vị_trí_dữ_liệu + 1; i < danh_sách_dữ_liệu.length; i++) {
-    const dữ_liệu_tiếp_theo = danh_sách_dữ_liệu[i]
-    tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu_tiếp_theo.vị_trí_ds_xuất_hiện)
-  }
-
-  console.log('tất cả vị trí dự đoán: ', tất_cả_ds_vị_trí_dự_đoán.length)
-
-  let tong_3 = 0
-  let tong_4 = 0
-  let tong_5 = 0
-  let tong5_5 = 0
-  let tong_6 = 0
-  let tổng_ds = 0
-
-  for (let j = 0; j < tất_cả_ds_vị_trí_dự_đoán.length; j++) {
-    const ds_vị_trí = tất_cả_ds_vị_trí_dự_đoán[j].map((n) => n + 1)
-    const tổng = kết_quả_xổ_số.filter((số) => ds_vị_trí.includes(Number(số))).length
-    tổng_ds++
-    if (tổng === 3) {
-      tong_3++
-    }
-    if (tổng === 4) {
-      tong_4++
-    }
-    if (tổng === 5) {
-      if (ds_vị_trí.includes(Number(dữ_liệu.số_jacpot_2))) {
-        console.log('trúng jackpot 2 tại: ', `vị trí ${j}`)
-        tong5_5++
-      } else {
-        console.log('trúng 5 tại: ', `vị trí ${j}`)
-        tong_5++
-      }
-    }
-    if (tổng === 6) {
-      console.log('trúng jackpot 1 tại: ', `vị trí ${j}`)
-      tong_6++
-    }
-  }
-
-  const formatter = new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-  })
-
-  console.log(kết_quả_xổ_số.join(', '))
-  console.log(
-    `tiền: ${formatter.format(tổng_ds * 10000)}, tổng: ${tổng_ds}, tong_3: ${tong_3}, tong_4: ${tong_4}, tong_5: ${tong_5}, jackpot_2: ${tong5_5}, jackpot_1: ${tong_6}`,
-  )
-  console.groupEnd()
-}
-
-function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
-  type Vị_Trí_Lặp_Lại = {
-    vị_trí: number
-    tổng_xuất_hiện: number
-    trùng: number
-    xuất_hiện: number[]
-  }
+async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
   const tập_vị_trí: Vị_Trí_Lặp_Lại[] = []
   const tất_cả_ds_vị_trí_dự_đoán: number[][] = []
+
   for (let k = danh_sách_dữ_liệu.length - 1; k >= 0; k--) {
     const dữ_liệu = danh_sách_dữ_liệu[k]
-    tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu.vị_trí_ds_xuất_hiện)
     const kết_quả_xổ_số = dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số || []
     const dự_đoán_ds_xuất_hiện = dữ_liệu.dự_đoán_ds_xuất_hiện
+
     for (let i = 0; i < dự_đoán_ds_xuất_hiện.length; i++) {
       const danh_sách = dự_đoán_ds_xuất_hiện[i]
+
       for (let j = 0; j < tất_cả_ds_vị_trí_dự_đoán.length; j++) {
         const ds_dự_đoán: string[] = []
         const ds_vị_trí = tất_cả_ds_vị_trí_dự_đoán[j]
@@ -431,42 +372,209 @@ function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tượng_X
         const tổng = ds_dự_đoán.filter((số) => kết_quả_xổ_số.includes(số)).length
         if (tổng === 5) {
           if (ds_vị_trí.includes(Number(dữ_liệu.số_jacpot_2))) {
-            const vị_trí_tồn_tại = tập_vị_trí.find((vị_trí) => vị_trí.vị_trí === j)
+            const vị_trí_tồn_tại = tập_vị_trí.find(
+              (vị_trí) =>
+                vị_trí.ds_vị_trí.sort().toString() === ds_vị_trí.sort().toString() &&
+                vị_trí.trùng === 5.5,
+            )
             if (vị_trí_tồn_tại) {
               vị_trí_tồn_tại.tổng_xuất_hiện += 1
               vị_trí_tồn_tại.xuất_hiện.push(k)
+              vị_trí_tồn_tại.danh_sách.push(i)
             } else {
-              tập_vị_trí.push({ vị_trí: j, tổng_xuất_hiện: 1, trùng: 5.5, xuất_hiện: [k] })
+              tập_vị_trí.push({
+                ds_vị_trí: ds_vị_trí,
+                tổng_xuất_hiện: 1,
+                trùng: 5.5,
+                xuất_hiện: [k],
+                danh_sách: [i],
+              })
             }
           } else {
-            const vị_trí_tồn_tại = tập_vị_trí.find((vị_trí) => vị_trí.vị_trí === j)
+            const vị_trí_tồn_tại = tập_vị_trí.find(
+              (vị_trí) =>
+                vị_trí.ds_vị_trí.sort().toString() === ds_vị_trí.sort().toString() &&
+                vị_trí.trùng === 5,
+            )
             if (vị_trí_tồn_tại) {
               vị_trí_tồn_tại.tổng_xuất_hiện += 1
               vị_trí_tồn_tại.xuất_hiện.push(k)
+              vị_trí_tồn_tại.danh_sách.push(i)
             } else {
-              tập_vị_trí.push({ vị_trí: j, tổng_xuất_hiện: 1, trùng: 5, xuất_hiện: [k] })
+              tập_vị_trí.push({
+                ds_vị_trí: ds_vị_trí,
+                tổng_xuất_hiện: 1,
+                trùng: 5,
+                xuất_hiện: [k],
+                danh_sách: [i],
+              })
             }
           }
         }
         if (tổng === 6) {
-          const vị_trí_tồn_tại = tập_vị_trí.find((vị_trí) => vị_trí.vị_trí === j)
+          const vị_trí_tồn_tại = tập_vị_trí.find(
+            (vị_trí) =>
+              vị_trí.ds_vị_trí.sort().toString() === ds_vị_trí.sort().toString() &&
+              vị_trí.trùng === 6,
+          )
           if (vị_trí_tồn_tại) {
             vị_trí_tồn_tại.tổng_xuất_hiện += 1
             vị_trí_tồn_tại.xuất_hiện.push(k)
+            vị_trí_tồn_tại.danh_sách.push(i)
           } else {
-            tập_vị_trí.push({ vị_trí: j, tổng_xuất_hiện: 1, trùng: 6, xuất_hiện: [k] })
+            tập_vị_trí.push({
+              ds_vị_trí: ds_vị_trí,
+              tổng_xuất_hiện: 1,
+              trùng: 6,
+              xuất_hiện: [k],
+              danh_sách: [i],
+            })
           }
         }
       }
     }
+
+    tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu.vị_trí_ds_xuất_hiện)
   }
-  // console.log(tập_vị_trí)
+  await dịch_vụ_indexeddb.khởi_tạo()
+  const dữ_liệu_đã_lưu = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(LOTE_55_HẰNG_SỐ)
+  if (dữ_liệu_đã_lưu) {
+    await dịch_vụ_indexeddb.cập_nhật_dữ_liệu(dữ_liệu_đã_lưu[0].id, tập_vị_trí)
+  } else {
+    await dịch_vụ_indexeddb.lưu_dữ_liệu(LOTE_55_HẰNG_SỐ, tập_vị_trí)
+  }
+
   const kết_quả = _.orderBy(
     tập_vị_trí,
     [(item) => Math.min(...item.xuất_hiện), (item) => item.trùng],
     ['asc', 'desc'],
-  )
+  ).map((item) => ({
+    ds_vị_trí: item.ds_vị_trí,
+    tổng_xuất_hiện: item.tổng_xuất_hiện,
+    trùng: item.trùng,
+    xuất_hiện: item.xuất_hiện.join(', '),
+    danh_sách: item.danh_sách.join(', '),
+  }))
   console.log('kết quả thống kê dự đoán: ', kết_quả)
+}
+
+async function phân_tích_và_dự_đoán() {
+  await dịch_vụ_indexeddb.khởi_tạo()
+  const dữ_liệu_lưu_trữ = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(LOTE_55_HẰNG_SỐ)
+  const dữ_liệu = dữ_liệu_lưu_trữ[0]?.dữ_liệu || []
+  const dữ_liệu_nhóm: Vị_Trí_Lặp_Lại[] = []
+
+  dữ_liệu.forEach((item: Vị_Trí_Lặp_Lại) => {
+    const vị_trí_tồn_tại = dữ_liệu_nhóm.find(
+      (vị_trí) => vị_trí.ds_vị_trí.sort().toString() === item.ds_vị_trí.sort().toString(),
+    )
+    if (vị_trí_tồn_tại) {
+      vị_trí_tồn_tại.tổng_xuất_hiện += item.tổng_xuất_hiện
+      vị_trí_tồn_tại.xuất_hiện.push(...item.xuất_hiện)
+      vị_trí_tồn_tại.danh_sách.push(...item.danh_sách)
+    } else {
+      dữ_liệu_nhóm.push({
+        ds_vị_trí: item.ds_vị_trí,
+        tổng_xuất_hiện: item.tổng_xuất_hiện,
+        trùng: item.trùng,
+        xuất_hiện: [...item.xuất_hiện],
+        danh_sách: [...item.danh_sách],
+      })
+    }
+  })
+
+  const kết_quả = _.orderBy(
+    dữ_liệu_nhóm,
+    [(item) => Math.min(...item.xuất_hiện), (item) => item.trùng],
+    ['asc', 'desc'],
+  ).map((item) => ({
+    ds_vị_trí: item.ds_vị_trí.sort().join(', '),
+    tổng_xuất_hiện: item.tổng_xuất_hiện,
+    trùng: item.trùng,
+    xuất_hiện: item.xuất_hiện.join(', '),
+    danh_sách: item.danh_sách.join(', '),
+  }))
+  console.group('Phân tích và dự đoán')
+  console.log('tổng danh sách: ', dữ_liệu.length)
+  console.log('sau khi nhóm: ', dữ_liệu_nhóm.length)
+  console.log('sau khi nhóm: ', kết_quả)
+  console.groupEnd()
+  const dữ_liệu2: Đối_Tượng_Xổ_Số = dữ_liệu_xổ_số_55[Number(vị_trí_phân_tích.value)]
+  const dự_đoán_ds_xuất_hiện = dữ_liệu2.dự_đoán_ds_xuất_hiện
+  const ds_đầu_tiên = dự_đoán_ds_xuất_hiện[Number(vị_trí_dự_đoán.value)] || []
+  let tổng_dự_đoán = 0
+  if (Number(vị_trí_phân_tích.value) === 0) {
+    // dự đoán
+    console.group('dự đoán')
+    const tất_cả_dự_đoán: string[][] = []
+    dữ_liệu_nhóm.forEach((item) => {
+      if (item.danh_sách.includes(Number(danh_sách_dự_đoán.value))) {
+        const ds_dự_đoán: string[] = []
+        item.ds_vị_trí.forEach((vị_trí) => {
+          ds_dự_đoán.push(ds_đầu_tiên[vị_trí])
+        })
+        tất_cả_dự_đoán.push(ds_dự_đoán)
+      }
+    })
+    console.log(tất_cả_dự_đoán)
+    console.groupEnd()
+  } else {
+    // phân tích
+    dữ_liệu_nhóm.forEach((item, j) => {
+      if (Number(j) > Number(vị_trí_phân_tích.value)) {
+        const ds_dự_đoán: string[] = []
+        item.ds_vị_trí.forEach((vị_trí) => {
+          ds_dự_đoán.push(ds_đầu_tiên[vị_trí])
+        })
+        const tổng = ds_dự_đoán.filter((số) => dữ_liệu2.kết_quả_xổ_số.includes(số)).length
+        if (tổng === 3) {
+          console.log('trúng 3 tại: ', `${Number(vị_trí_phân_tích.value)} vị trí ${j}`)
+        }
+        if (tổng === 4) {
+          console.log('trúng 4 tại: ', `${Number(vị_trí_phân_tích.value)} vị trí ${j}`)
+        }
+        if (tổng === 5) {
+          if (ds_dự_đoán.includes(dữ_liệu2.số_jacpot_2)) {
+            console.log('trúng jackpot 2 tại: ', `${vị_trí_phân_tích.value} vị trí ${j}`)
+          } else {
+            console.log('trúng 5 tại: ', `${vị_trí_phân_tích.value} vị trí ${j}`)
+          }
+        }
+        if (tổng === 6) {
+          console.log('trúng jackpot 1 tại: ', `${vị_trí_phân_tích.value} vị trí ${j}`)
+        }
+        tổng_dự_đoán++
+      }
+    })
+    console.log('tổng số dự đoán :', tổng_dự_đoán)
+  }
+}
+
+function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
+  const vị_trí_xem = Number(vị_trí_xem_số_lần_xuất_hiện.value)
+  const số_lần_xuất_hiện = Number(số_xuất_hiện_nhiều_lần.value)
+  const từ_vị_trí = Number(từ_vị_trí_số_xuất_hiện_nhiều_lần.value)
+  const chu_kỳ = Number(chu_kỳ_số_xuất_hiện_nhiều_lần.value)
+  for (let i = từ_vị_trí; i < 100; i++) {
+    const danh_sách_số_lần_xuất_hiện = new Set<string>()
+    dữ_liệu_xổ_số_55.slice(i, i + chu_kỳ).forEach((dữ_liệu) => {
+      dữ_liệu.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.forEach((mục) => {
+        const tổng_số_xuất_hiện = mục.tổng_xuất_hiện
+        if (tổng_số_xuất_hiện >= số_lần_xuất_hiện && danh_sách_số_lần_xuất_hiện.size < 6) {
+          danh_sách_số_lần_xuất_hiện.add(mục.số_xuất_hiện)
+        }
+      })
+    })
+    const tổng = dữ_liệu_xổ_số_55[vị_trí_xem].kết_quả_xổ_số.filter((số) =>
+      danh_sách_số_lần_xuất_hiện.has(số),
+    ).length
+    if (danh_sách_số_lần_xuất_hiện.size >= 6 && tổng >= 2) {
+      console.group('Số xuất hiện nhiều lần')
+      console.log([...danh_sách_số_lần_xuất_hiện.values()].join(', '))
+      console.log(`tổng số trùng với kết quả xổ số tại vị trí ${vị_trí_xem}: ${tổng}`)
+      console.groupEnd()
+    }
+  }
 }
 </script>
 
@@ -482,43 +590,94 @@ function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tượng_X
     }"
   >
     <div
-      :style="{ position: 'sticky', top: '0px', background: '#0a0a1a', padding: '4px', zIndex: 1 }"
+      :style="{
+        position: 'sticky',
+        top: '0px',
+        background: '#0a0a1a',
+        padding: '4px',
+        zIndex: 1,
+        display: 'flex',
+        'flex-direction': 'row',
+        gap: '12px',
+      }"
     >
-      <div :style="{ display: 'flex', gap: '20px', 'align-items': 'center' }">
+      <div>
+        <div :style="{ display: 'flex', gap: '20px', 'align-items': 'center' }">
+          <div>
+            <select v-model="số_dữ_liệu_sẽ_được_hiển_thị">
+              <option
+                v-for="giá_trị in các_tùy_chọn_để_hiển_thị_dữ_liệu"
+                :key="giá_trị"
+                :value="giá_trị"
+              >
+                {{ giá_trị }}
+              </option>
+            </select>
+          </div>
+        </div>
         <div>
-          <select v-model="số_dữ_liệu_sẽ_được_hiển_thị">
-            <option
-              v-for="giá_trị in các_tùy_chọn_để_hiển_thị_dữ_liệu"
-              :key="giá_trị"
-              :value="giá_trị"
-            >
-              {{ giá_trị }}
-            </option>
-          </select>
+          Hôm nay dự đoán cho:
+          <span :style="{ color: 'greenyellow', fontSize: '18px' }">{{
+            mở_xổ_số_loại_tiếp_theo
+          }}</span>
+        </div>
+        <div>
+          <div :style="{ display: 'flex', 'align-items': 'center' }">
+            <div :style="{ background: 'red', width: '10px', height: '10px' }"></div>
+            Kết quả dự đoán
+            <input v-model="màu_kết_quả_dự_đoán" type="checkbox" />
+          </div>
+          <div :style="{ display: 'flex', 'align-items': 'center' }">
+            <div :style="{ background: 'blue', width: '10px', height: '10px' }"></div>
+            Kết quả hiện tại
+            <input v-model="màu_kết_quả_hiện_tại" type="checkbox" />
+          </div>
+        </div>
+        <div>Hiển thị chi tiết: <input v-model="có_hiển_thị_chi_tiết" type="checkbox" /></div>
+      </div>
+
+      <div>
+        <div>
+          <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán</button> để lưu vào
+          indexed DB
+          <div>
+            từ Indexed DB<button @click="phân_tích_và_dự_đoán()">phân tích và dự đoán</button>
+            chỉ mục
+            <input
+              type="text"
+              v-model="vị_trí_phân_tích"
+              placeholder="Nhập vị trí phân tích"
+              :style="{ width: '20px' }"
+            />
+            danh sách dự đoán
+            <input
+              type="text"
+              v-model="vị_trí_dự_đoán"
+              placeholder="Nhập vị trí dự đoán"
+              :style="{ width: '20px' }"
+            />
+            <div>
+              danh sách dự đoán với (chỉ mục = 0)
+              <input type="text" v-model="danh_sách_dự_đoán" :style="{ width: '20px' }" />
+            </div>
+          </div>
+        </div>
+        <div>
+          Số Xuất hiện nhiều lần:
+          <input v-model="vị_trí_xem_số_lần_xuất_hiện" type="text" :style="{ width: '20px' }" />
+          bao nhiêu lần:
+          <input v-model="số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
+          từ vị trí:
+          <input
+            v-model="từ_vị_trí_số_xuất_hiện_nhiều_lần"
+            type="text"
+            :style="{ width: '20px' }"
+          />
+          xem bao nhiêu:
+          <input v-model="chu_kỳ_số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
+          <button @click="lọc_dữ_liệu_theo_số_lần_xuất_hiện()">Lọc</button>
         </div>
       </div>
-      <div>
-        Hôm nay dự đoán cho:
-        <span :style="{ color: 'greenyellow', fontSize: '18px' }">{{
-          mở_xổ_số_loại_tiếp_theo
-        }}</span>
-      </div>
-      <div>
-        <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán</button>
-      </div>
-      <div>
-        <div :style="{ display: 'flex', 'align-items': 'center' }">
-          <div :style="{ background: 'red', width: '10px', height: '10px' }"></div>
-          Kết quả dự đoán
-          <input v-model="màu_kết_quả_dự_đoán" type="checkbox" />
-        </div>
-        <div :style="{ display: 'flex', 'align-items': 'center' }">
-          <div :style="{ background: 'blue', width: '10px', height: '10px' }"></div>
-          Kết quả hiện tại
-          <input v-model="màu_kết_quả_hiện_tại" type="checkbox" />
-        </div>
-      </div>
-      <div>Hiển thị chi tiết: <input v-model="có_hiển_thị_chi_tiết" type="checkbox" /></div>
     </div>
 
     <div :style="{ display: 'flex', gap: '40px' }">
@@ -565,9 +724,6 @@ function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tượng_X
                 "
               >
                 xem danh sách
-              </button>
-              <button @click="xem_dự_đoán_cho_tất_cả_vị_trí(dữ_liệu_xổ_số_55, dữ_liệu)">
-                Dự đoán vị trí
               </button>
             </div>
             <div
