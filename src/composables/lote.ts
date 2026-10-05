@@ -1,10 +1,9 @@
 import moment from 'moment'
-import _ from 'lodash'
 
 import csv_dữ_liệu_55 from '@/assets/csv/lote55.csv?raw'
 import csv_dữ_liệu_45 from '@/assets/csv/lote45.csv?raw'
 
-import { Đối_Tượng_Xổ_Số, type Dữ_Liệu_Xuât_Hiện } from '@/types/lote'
+import { Đối_Tượng_Xổ_Số } from '@/types/lote'
 
 import { lấy_dấu_thời_gian_của_các_kỳ_tiếp_theo } from '@/utils'
 
@@ -110,6 +109,25 @@ export function lấy_dữ_liệu_xổ_số_55(): Array<Đối_Tượng_Xổ_S�
   return dữ_liệu
 }
 
+// Bộ nhớ đệm: kết quả của từng kỳ dưới dạng số, để không phải Number() lặp lại hàng triệu lần
+const bộ_nhớ_đệm_số_theo_kỳ = new WeakMap<Array<Đối_Tượng_Xổ_Số>, number[][]>()
+const nhãn_theo_số: string[] = []
+
+function lấy_số_theo_kỳ(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>): number[][] {
+  let số_theo_kỳ = bộ_nhớ_đệm_số_theo_kỳ.get(danh_sách_dữ_liệu)
+  if (!số_theo_kỳ) {
+    số_theo_kỳ = danh_sách_dữ_liệu.map((dữ_liệu) =>
+      dữ_liệu.kết_quả_xổ_số.map((số) => {
+        const giá_trị = Number(số)
+        nhãn_theo_số[giá_trị] = số
+        return giá_trị
+      }),
+    )
+    bộ_nhớ_đệm_số_theo_kỳ.set(danh_sách_dữ_liệu, số_theo_kỳ)
+  }
+  return số_theo_kỳ
+}
+
 export const tạo_ds_xuất_hiện = (
   danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
   danh_sách_dữ_liệu_khác: Array<Đối_Tượng_Xổ_Số>,
@@ -119,36 +137,42 @@ export const tạo_ds_xuất_hiện = (
 ): string[][] => {
   const kết_quả_xuất_hiện: string[][] = []
 
-  const danh_sách_vị_trí_chính: number[] = đối_tượng.kết_quả_xổ_số.map((số) => vị_trí + Number(số))
+  const số_theo_kỳ = lấy_số_theo_kỳ(danh_sách_dữ_liệu)
+  const số_theo_kỳ_khác = lấy_số_theo_kỳ(danh_sách_dữ_liệu_khác)
 
+  // phần chính không đổi theo i nên tính một lần; phần phụ cộng vào rồi trừ ra sau mỗi vòng
+  const tổng_xuất_hiện = new Uint16Array(128)
+  const thứ_tự_xuất_hiện: number[] = []
+  const thêm_số = (số: number) => {
+    if (tổng_xuất_hiện[số]++ === 0) thứ_tự_xuất_hiện.push(số)
+  }
+
+  đối_tượng.kết_quả_xổ_số.forEach((số) => {
+    số_theo_kỳ[vị_trí + Number(số)]?.forEach(thêm_số)
+  })
+
+  const danh_sách_đã_thêm: number[] = []
   for (let i = vị_trí; i < danh_sách_dữ_liệu.length; i++) {
-    const danh_sách_xuất_hiện: Dữ_Liệu_Xuât_Hiện[] = []
-    const danh_sách_vị_trí_phụ: number[] =
-      danh_sách_dữ_liệu_khác[i]?.kết_quả_xổ_số.map((số) => vị_trí + Number(số)) || []
+    const độ_dài_trước_khi_thêm = thứ_tự_xuất_hiện.length
+    danh_sách_đã_thêm.length = 0
 
-    const danh_sách_vị_trí = [...danh_sách_vị_trí_chính, ...danh_sách_vị_trí_phụ]
-
-    danh_sách_vị_trí.forEach((vị_trí_số) => {
-      const kết_quả_xổ_số = danh_sách_dữ_liệu[vị_trí_số]?.kết_quả_xổ_số || []
-      kết_quả_xổ_số.forEach((số) => {
-        const xuất_hiện = danh_sách_xuất_hiện.find((x) => x.số_xuất_hiện === số)
-        if (xuất_hiện) {
-          xuất_hiện.tổng_xuất_hiện += 1
-        } else {
-          danh_sách_xuất_hiện.push({
-            số_xuất_hiện: số,
-            tổng_xuất_hiện: 1,
-          })
-        }
+    số_theo_kỳ_khác[i]?.forEach((số_phụ) => {
+      số_theo_kỳ[vị_trí + số_phụ]?.forEach((số) => {
+        thêm_số(số)
+        danh_sách_đã_thêm.push(số)
       })
     })
 
-    if (danh_sách_xuất_hiện.length === bao_nhiêu_xuất_hiện) {
-      const kết_quả = _.sortBy(danh_sách_xuất_hiện, ['tổng_xuất_hiện'], ['asc']).map(
-        (x) => x.số_xuất_hiện,
-      )
+    if (thứ_tự_xuất_hiện.length === bao_nhiêu_xuất_hiện) {
+      // sort ổn định: số bằng tổng giữ nguyên thứ tự xuất hiện lần đầu
+      const kết_quả = [...thứ_tự_xuất_hiện]
+        .sort((a, b) => tổng_xuất_hiện[a] - tổng_xuất_hiện[b])
+        .map((số) => nhãn_theo_số[số])
       kết_quả_xuất_hiện.push(kết_quả)
     }
+
+    danh_sách_đã_thêm.forEach((số) => tổng_xuất_hiện[số]--)
+    thứ_tự_xuất_hiện.length = độ_dài_trước_khi_thêm
   }
   return kết_quả_xuất_hiện
 }

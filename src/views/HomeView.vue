@@ -4,6 +4,15 @@ import moment from 'moment'
 
 import { lấy_dữ_liệu_xổ_số_45, lấy_dữ_liệu_xổ_số_55, tạo_ds_xuất_hiện } from '@/composables/lote'
 
+import { chạy_backtest } from '@/composables/backtest'
+import { phân_tích_ghép_chéo } from '@/composables/cross-analysis'
+import { tạo_bộ_vé_phủ } from '@/composables/ticket-optimizer'
+import {
+  đọc_bộ_nhớ_đệm,
+  ghi_bộ_nhớ_đệm,
+  tạo_dấu_vân_tay,
+  type Dự_Đoán_Đã_Lưu,
+} from '@/composables/prediction-cache'
 import { dịch_vụ_indexeddb, type Vị_Trí_Lặp_Lại } from '@/composables/indexeddb-service'
 
 import { Đối_Tượng_Xổ_Số, type Loại_Dữ_Liệu_Xuât_Hiện } from '@/types/lote'
@@ -14,7 +23,18 @@ import _ from 'lodash'
 const màu_kết_quả_dự_đoán = ref<boolean>(true)
 const màu_kết_quả_hiện_tại = ref<boolean>(true)
 
+const LOTE_45_HẰNG_SỐ = 'lote_45'
 const LOTE_55_HẰNG_SỐ = 'lote_55'
+
+// số lượng số xuất hiện để một danh sách dự đoán được chấp nhận (xem tạo_ds_xuất_hiện)
+const SỐ_XUẤT_HIỆN_45 = 40
+const SỐ_XUẤT_HIỆN_55 = 46
+// tăng số này khi đổi thuật toán tạo danh sách dự đoán để bỏ cache cũ trong IndexedDB
+const PHIÊN_BẢN_BỘ_NHỚ_ĐỆM = 1
+
+function lấy_tên_lưu_trữ(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>): string {
+  return danh_sách_dữ_liệu[0].loại_xổ_số === 45 ? LOTE_45_HẰNG_SỐ : LOTE_55_HẰNG_SỐ
+}
 
 //
 // các biến không dùng ràng buộc hiển thị
@@ -41,6 +61,9 @@ const các_tùy_chọn_để_hiển_thị_dữ_liệu = ref<number[]>([])
 const số_dữ_liệu_sẽ_được_hiển_thị = ref<number>(7)
 
 const có_hiển_thị_chi_tiết = ref<boolean>(false)
+
+const kích_thước_nhóm_số = ref<number>(12)
+const mức_đảm_bảo_trúng = ref<number>(3)
 
 const vị_trí_phân_tích = ref<number>(1)
 const vị_trí_dự_đoán = ref<number>(2)
@@ -71,13 +94,49 @@ async function chạy_chức_năng_chính(danh_sách_dữ_liệu: Array<Đối_T
 
     // xữ lý dữ liệu xuất hiện
     xữ_lý_dữ_liệu_xuất_hiện(danh_sách_dữ_liệu, dữ_liệu_1, dữ_liệu_2, vị_trí_dữ_liệu)
+  }
+}
 
-    tạo_ds_xuất_hiện_tại_vị_trí_chỉ_định(
-      danh_sách_dữ_liệu,
-      danh_sách_dữ_liệu_45_hoặc_55,
-      dữ_liệu_1,
-      vị_trí_dữ_liệu,
-    )
+// danh sách dự đoán chỉ phụ thuộc vào dữ liệu CSV nên lưu vào IndexedDB, lần sau khỏi tính lại
+async function chuẩn_bị_ds_dự_đoán() {
+  const tham_số = `v${PHIÊN_BẢN_BỘ_NHỚ_ĐỆM}|45:${SỐ_XUẤT_HIỆN_45}|55:${SỐ_XUẤT_HIỆN_55}`
+
+  for (const [danh_sách_dữ_liệu, danh_sách_dữ_liệu_khác] of [
+    [dữ_liệu_xổ_số_45, dữ_liệu_xổ_số_55],
+    [dữ_liệu_xổ_số_55, dữ_liệu_xổ_số_45],
+  ]) {
+    const loại_xổ_số = danh_sách_dữ_liệu[0].loại_xổ_số
+    const khóa = `ds_dự_đoán_${loại_xổ_số}`
+    const dấu_vân_tay = tạo_dấu_vân_tay(danh_sách_dữ_liệu, danh_sách_dữ_liệu_khác, tham_số)
+
+    const đã_lưu = await đọc_bộ_nhớ_đệm<Dự_Đoán_Đã_Lưu>(khóa)
+    if (
+      đã_lưu?.dấu_vân_tay === dấu_vân_tay &&
+      đã_lưu.dự_đoán_ds_xuất_hiện.length === danh_sách_dữ_liệu.length &&
+      đã_lưu.vị_trí_ds_xuất_hiện.length === danh_sách_dữ_liệu.length
+    ) {
+      danh_sách_dữ_liệu.forEach((dữ_liệu, vị_trí) => {
+        dữ_liệu.dự_đoán_ds_xuất_hiện = đã_lưu.dự_đoán_ds_xuất_hiện[vị_trí]
+        dữ_liệu.vị_trí_ds_xuất_hiện = đã_lưu.vị_trí_ds_xuất_hiện[vị_trí]
+      })
+      console.log(`đã tải danh sách dự đoán ${loại_xổ_số} từ bộ nhớ đệm`)
+      continue
+    }
+
+    danh_sách_dữ_liệu.forEach((dữ_liệu, vị_trí) => {
+      tạo_ds_xuất_hiện_tại_vị_trí_chỉ_định(
+        danh_sách_dữ_liệu,
+        danh_sách_dữ_liệu_khác,
+        dữ_liệu,
+        vị_trí,
+      )
+    })
+    await ghi_bộ_nhớ_đệm<Dự_Đoán_Đã_Lưu>(khóa, {
+      dấu_vân_tay,
+      dự_đoán_ds_xuất_hiện: danh_sách_dữ_liệu.map((dữ_liệu) => dữ_liệu.dự_đoán_ds_xuất_hiện),
+      vị_trí_ds_xuất_hiện: danh_sách_dữ_liệu.map((dữ_liệu) => dữ_liệu.vị_trí_ds_xuất_hiện),
+    })
+    console.log(`đã tạo và lưu danh sách dự đoán ${loại_xổ_số} vào bộ nhớ đệm`)
   }
 }
 
@@ -155,7 +214,10 @@ function xữ_lý_dữ_liệu_xuất_hiện(
     ).length || 0
 }
 
-khởi_tạo_hiển_thị()
+chuẩn_bị_ds_dự_đoán().then(() => {
+  khởi_tạo_hiển_thị()
+  khởi_tạo_in_nhật_ký()
+})
 
 function khởi_tạo_hiển_thị() {
   các_tùy_chọn_để_hiển_thị_dữ_liệu.value = tạo_tùy_chọn_để_hiển_thị(
@@ -164,8 +226,6 @@ function khởi_tạo_hiển_thị() {
   danh_sách_dữ_liệu_hiển_thị_45.value = dữ_liệu_xổ_số_45
   danh_sách_dữ_liệu_hiển_thị_55.value = dữ_liệu_xổ_số_55
 }
-
-khởi_tạo_in_nhật_ký()
 
 function khởi_tạo_in_nhật_ký() {
   console.log('danh sách dữ liệu 45 đã qua xữ lý: ', dữ_liệu_xổ_số_45)
@@ -240,7 +300,7 @@ function tạo_ds_xuất_hiện_tại_vị_trí_chỉ_định(
     danh_sách_dữ_liệu_khác,
     dữ_liệu,
     vị_trí_dữ_liệu,
-    dữ_liệu.loại_xổ_số === 55 ? 46 : 40,
+    dữ_liệu.loại_xổ_số === 55 ? SỐ_XUẤT_HIỆN_55 : SỐ_XUẤT_HIỆN_45,
   )
 
   if (vị_trí_dữ_liệu > 0) {
@@ -436,19 +496,20 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
 
     tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu.vị_trí_ds_xuất_hiện)
   }
+  const tên_lưu_trữ = lấy_tên_lưu_trữ(danh_sách_dữ_liệu)
   await dịch_vụ_indexeddb.khởi_tạo()
-  const dữ_liệu_đã_lưu = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(LOTE_55_HẰNG_SỐ)
-  if (dữ_liệu_đã_lưu) {
+  const dữ_liệu_đã_lưu = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(tên_lưu_trữ)
+  if (dữ_liệu_đã_lưu.length > 0) {
     await dịch_vụ_indexeddb.cập_nhật_dữ_liệu(dữ_liệu_đã_lưu[0].id, tập_vị_trí)
   } else {
-    await dịch_vụ_indexeddb.lưu_dữ_liệu(LOTE_55_HẰNG_SỐ, tập_vị_trí)
+    await dịch_vụ_indexeddb.lưu_dữ_liệu(tên_lưu_trữ, tập_vị_trí)
   }
 
   const kết_quả = _.orderBy(
     tập_vị_trí,
-    [(item) => Math.min(...item.xuất_hiện), (item) => item.trùng],
+    [(item: Vị_Trí_Lặp_Lại) => Math.min(...item.xuất_hiện), (item: Vị_Trí_Lặp_Lại) => item.trùng],
     ['asc', 'desc'],
-  ).map((item) => ({
+  ).map((item: Vị_Trí_Lặp_Lại) => ({
     ds_vị_trí: item.ds_vị_trí,
     tổng_xuất_hiện: item.tổng_xuất_hiện,
     trùng: item.trùng,
@@ -458,9 +519,11 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
   console.log('kết quả thống kê dự đoán: ', kết_quả)
 }
 
-async function phân_tích_và_dự_đoán() {
+async function phân_tích_và_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
   await dịch_vụ_indexeddb.khởi_tạo()
-  const dữ_liệu_lưu_trữ = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(LOTE_55_HẰNG_SỐ)
+  const dữ_liệu_lưu_trữ = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(
+    lấy_tên_lưu_trữ(danh_sách_dữ_liệu),
+  )
   const dữ_liệu = dữ_liệu_lưu_trữ[0]?.dữ_liệu || []
   const dữ_liệu_nhóm: Vị_Trí_Lặp_Lại[] = []
 
@@ -485,9 +548,9 @@ async function phân_tích_và_dự_đoán() {
 
   const kết_quả = _.orderBy(
     dữ_liệu_nhóm,
-    [(item) => Math.min(...item.xuất_hiện), (item) => item.trùng],
+    [(item: Vị_Trí_Lặp_Lại) => Math.min(...item.xuất_hiện), (item: Vị_Trí_Lặp_Lại) => item.trùng],
     ['asc', 'desc'],
-  ).map((item) => ({
+  ).map((item: Vị_Trí_Lặp_Lại) => ({
     ds_vị_trí: item.ds_vị_trí.sort().join(', '),
     tổng_xuất_hiện: item.tổng_xuất_hiện,
     trùng: item.trùng,
@@ -499,7 +562,7 @@ async function phân_tích_và_dự_đoán() {
   console.log('sau khi nhóm: ', dữ_liệu_nhóm.length)
   console.log('sau khi nhóm: ', kết_quả)
   console.groupEnd()
-  const dữ_liệu2: Đối_Tượng_Xổ_Số = dữ_liệu_xổ_số_55[Number(vị_trí_phân_tích.value)]
+  const dữ_liệu2: Đối_Tượng_Xổ_Số = danh_sách_dữ_liệu[Number(vị_trí_phân_tích.value)]
   const dự_đoán_ds_xuất_hiện = dữ_liệu2.dự_đoán_ds_xuất_hiện
   const ds_đầu_tiên = dự_đoán_ds_xuất_hiện[Number(vị_trí_dự_đoán.value)] || []
   let tổng_dự_đoán = 0
@@ -520,6 +583,7 @@ async function phân_tích_và_dự_đoán() {
     console.groupEnd()
   } else {
     // phân tích
+    console.group('phân tích')
     dữ_liệu_nhóm.forEach((item, j) => {
       if (Number(j) > Number(vị_trí_phân_tích.value)) {
         const ds_dự_đoán: string[] = []
@@ -547,7 +611,56 @@ async function phân_tích_và_dự_đoán() {
       }
     })
     console.log('tổng số dự đoán :', tổng_dự_đoán)
+    console.groupEnd()
   }
+}
+
+function chạy_backtest_và_in_kết_quả(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
+  const kết_quả = chạy_backtest(danh_sách_dữ_liệu)
+  const định_dạng_tiền = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+
+  console.group(`Backtest ${kết_quả.loại_xổ_số}`)
+  console.log(`số kỳ đã thử: ${kết_quả.số_kỳ_đã_thử}, tổng vé: ${kết_quả.tổng_vé}`)
+  console.log(
+    `chi phí: ${định_dạng_tiền.format(kết_quả.chi_phí)}, tiền thắng: ${định_dạng_tiền.format(kết_quả.tiền_thắng)}, lãi/lỗ: ${định_dạng_tiền.format(kết_quả.lãi_lỗ)}`,
+  )
+  console.table(kết_quả.các_dòng)
+  console.log('z > 3: hơn ngẫu nhiên đáng kể; z gần 0: không khác ngẫu nhiên')
+  console.groupEnd()
+}
+
+function tạo_và_in_bộ_vé(loại_xổ_số: number) {
+  try {
+    const bộ_vé = tạo_bộ_vé_phủ(
+      loại_xổ_số,
+      Number(kích_thước_nhóm_số.value),
+      Number(mức_đảm_bảo_trúng.value),
+    )
+    const định_dạng_tiền = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+
+    console.group(`Bộ vé phủ ${loại_xổ_số}`)
+    console.log('nhóm số: ', bộ_vé.nhóm_số.join(', '))
+    console.log(
+      `số vé: ${bộ_vé.vé.length}, chi phí: ${định_dạng_tiền.format(bộ_vé.chi_phí)}, đảm bảo trúng ít nhất ${bộ_vé.mức_đảm_bảo} số khi có từ ${bộ_vé.mức_đảm_bảo} số trúng nằm trong nhóm (xác suất ${(bộ_vé.xác_suất_đạt_đảm_bảo * 100).toFixed(2)}%)`,
+    )
+    console.log(
+      `điểm phổ biến trung bình: ${bộ_vé.điểm_phổ_biến_trung_bình} (vé ngẫu nhiên: ${bộ_vé.điểm_phổ_biến_vé_ngẫu_nhiên}, càng thấp càng ít người trùng)`,
+    )
+    console.log(bộ_vé.vé.map((vé) => vé.join(' ')).join('\n'))
+    console.groupEnd()
+  } catch (lỗi) {
+    console.warn((lỗi as Error).message)
+  }
+}
+
+function chạy_phân_tích_ghép_chéo() {
+  console.group('Ghép chéo 45 và 55')
+  phân_tích_ghép_chéo(dữ_liệu_xổ_số_45, dữ_liệu_xổ_số_55).forEach((kết_quả) => {
+    console.log(`loại ${kết_quả.loại_xổ_số}: ${kết_quả.số_bộ_ba_kỳ} bộ ba kỳ (A, B, C)`)
+    console.table(kết_quả.các_dòng)
+  })
+  console.log('A: kỳ trước cùng loại; B: kỳ khác loại nằm giữa; C: kỳ cần dự đoán. z > 3: có tín hiệu')
+  console.groupEnd()
 }
 
 function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
@@ -638,10 +751,26 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
 
       <div>
         <div>
-          <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán</button> để lưu vào
+          <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán 55</button>
+          <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_45)">thống kê dự đoán 45</button>
+          <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_55)">backtest 55</button>
+          <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_45)">backtest 45</button>
+          <button @click="chạy_phân_tích_ghép_chéo()">ghép chéo 45/55</button>
+          <div>
+            bộ vé phủ: nhóm
+            <input v-model="kích_thước_nhóm_số" type="text" :style="{ width: '20px' }" />
+            số, đảm bảo trúng
+            <input v-model="mức_đảm_bảo_trúng" type="text" :style="{ width: '20px' }" />
+            số
+            <button @click="tạo_và_in_bộ_vé(55)">tạo vé 55</button>
+            <button @click="tạo_và_in_bộ_vé(45)">tạo vé 45</button>
+          </div>
+          để lưu vào
           indexed DB
           <div>
-            từ Indexed DB<button @click="phân_tích_và_dự_đoán()">phân tích và dự đoán</button>
+            từ Indexed DB<button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55)">
+              phân tích và dự đoán 55</button
+            ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45)">phân tích và dự đoán 45</button>
             chỉ mục
             <input
               type="text"
@@ -770,7 +899,7 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
             <component :is="() => hiển_thị_danh_sách_xuất_hiện(dữ_liệu, vị_trí)" />
             <div>tổng danh sách: {{ dữ_liệu.dự_đoán_ds_xuất_hiện.length }}</div>
             <div>
-              <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_55, dữ_liệu)">
+              <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_45, dữ_liệu)">
                 xem dự đoán
               </button>
               <button
@@ -792,7 +921,7 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
                   {{ vị_trí_xh
                   }}<component :is="() => hiển_thị_ds_dự_đoán_xuất_hiện(ds, dữ_liệu)" />
                 </div>
-                <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_55, dữ_liệu, vị_trí_xh)">
+                <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_45, dữ_liệu, vị_trí_xh)">
                   xem dự đoán
                 </button>
               </div>
