@@ -96,20 +96,25 @@ export function chạy_backtest(danh_sách_dữ_liệu: Array<Đối_Tượng_X�
       số_kỳ_đã_thử++
 
       for (const danh_sách of dữ_liệu.dự_đoán_ds_xuất_hiện) {
+        // vòng trong chạy hàng trăm triệu lần nên tính trước vị trí nào của danh sách trúng, và vị trí của số phụ
+        const vị_trí_trúng = new Uint8Array(danh_sách.length)
+        danh_sách.forEach((số, vị_trí) => {
+          if (kết_quả.has(số)) vị_trí_trúng[vị_trí] = 1
+        })
+        const vị_trí_số_phụ = danh_sách.indexOf(kỳ_sau.số_jacpot_2)
+
         for (const ds_vị_trí of vị_trí_đã_học) {
           tổng_vé++
           let số_trúng = 0
-          let có_số_phụ = false
-          for (const vị_trí of ds_vị_trí) {
-            const số = danh_sách[vị_trí]
-            if (kết_quả.has(số)) số_trúng++
-            else if (số === kỳ_sau.số_jacpot_2) có_số_phụ = true
+          for (let m = 0; m < ds_vị_trí.length; m++) {
+            số_trúng += vị_trí_trúng[ds_vị_trí[m]] | 0
           }
           if (số_trúng === 3) thực_tế.trúng_3++
           else if (số_trúng === 4) thực_tế.trúng_4++
           else if (số_trúng === 5) {
-            if (có_jackpot_2 && có_số_phụ) thực_tế.jackpot_2++
-            else thực_tế.trúng_5++
+            if (có_jackpot_2 && vị_trí_số_phụ >= 0 && ds_vị_trí.includes(vị_trí_số_phụ)) {
+              thực_tế.jackpot_2++
+            } else thực_tế.trúng_5++
           } else if (số_trúng === 6) thực_tế.jackpot_1++
         }
       }

@@ -8,6 +8,13 @@ import { chạy_backtest } from '@/composables/backtest'
 import { phân_tích_ghép_chéo } from '@/composables/cross-analysis'
 import { tạo_bộ_vé_phủ } from '@/composables/ticket-optimizer'
 import {
+  backtest_bộ_vé,
+  CÁC_CHIẾN_LƯỢC,
+  SỐ_VÉ_MỤC_TIÊU,
+  tạo_danh_sách_vé,
+  xác_suất_một_vé,
+} from '@/composables/ticket-portfolio'
+import {
   đọc_bộ_nhớ_đệm,
   ghi_bộ_nhớ_đệm,
   tạo_dấu_vân_tay,
@@ -62,6 +69,50 @@ const số_dữ_liệu_sẽ_được_hiển_thị = ref<number>(7)
 
 const có_hiển_thị_chi_tiết = ref<boolean>(false)
 
+// bộ lọc bộ vị trí khi xem dự đoán; -1 là không lọc, hai điều kiện đặt cùng lúc thì chỉ cần thỏa một (or)
+const SỐ_VỊ_TRÍ_MỖI_HÀNG = 6
+const lọc_số_trùng_trong_cột = ref<number>(-1)
+const lọc_số_cùng_hàng = ref<number>(-1)
+
+// đếm số nhóm (cột hoặc hàng) chứa `số_lượng` vị trí: đúng số_lượng, hoặc từ số_lượng trở lên
+function đếm_nhóm_chứa(
+  ds_vị_trí: number[],
+  số_lượng: number,
+  lấy_nhóm: (vị_trí: number) => number,
+  từ_số_lượng_trở_lên: boolean,
+) {
+  const số_vị_trí_mỗi_nhóm = new Map<number, number>()
+  ds_vị_trí.forEach((vị_trí) => {
+    const nhóm = lấy_nhóm(vị_trí)
+    số_vị_trí_mỗi_nhóm.set(nhóm, (số_vị_trí_mỗi_nhóm.get(nhóm) ?? 0) + 1)
+  })
+  return [...số_vị_trí_mỗi_nhóm.values()].filter((số_vị_trí) =>
+    từ_số_lượng_trở_lên ? số_vị_trí >= số_lượng : số_vị_trí === số_lượng,
+  ).length
+}
+
+function qua_bộ_lọc_vị_trí(ds_vị_trí: number[]): boolean {
+  const số_trùng_cột = Number(lọc_số_trùng_trong_cột.value)
+  const số_cùng_hàng = Number(lọc_số_cùng_hàng.value)
+  if (số_trùng_cột === -1 && số_cùng_hàng === -1) return true
+
+  return (
+    // cột: ít nhất N cột có từ 2 số trở lên (3, 4 số trên cùng cột cũng tính), N tối đa 3 vì chỉ có 6 số
+    (số_trùng_cột !== -1 &&
+      đếm_nhóm_chứa(ds_vị_trí, 2, (vị_trí) => vị_trí % SỐ_VỊ_TRÍ_MỖI_HÀNG, true) >= số_trùng_cột) ||
+    // hàng: có hàng chứa đúng số lượng đã chọn
+    (số_cùng_hàng !== -1 &&
+      đếm_nhóm_chứa(
+        ds_vị_trí,
+        số_cùng_hàng,
+        (vị_trí) => Math.floor(vị_trí / SỐ_VỊ_TRÍ_MỖI_HÀNG),
+        false,
+      ) >= 1)
+  )
+}
+
+const chiến_lược_vé = ref<string>('ngẫu_nhiên')
+const TẤT_CẢ_CHIẾN_LƯỢC = 'tất_cả'
 const kích_thước_nhóm_số = ref<number>(12)
 const mức_đảm_bảo_trúng = ref<number>(3)
 
@@ -354,10 +405,13 @@ function xem_dự_đoán_cho_tất_cả(
   // lấy tất cả vị trí dự đoán
   for (let k = dữ_liệu.vị_trí_dữ_liệu + 1; k < danh_sách_dữ_liệu.length; k++) {
     const dữ_liệu_tiếp_theo = danh_sách_dữ_liệu[k]
-    tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu_tiếp_theo.vị_trí_ds_xuất_hiện)
+    tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu_tiếp_theo.vị_trí_ds_xuất_hiện.filter(qua_bộ_lọc_vị_trí))
   }
 
   console.log('tất cả vị trí dự đoán: ', tất_cả_ds_vị_trí_dự_đoán.length)
+  console.log(
+    `bộ lọc: số trùng trong cột = ${lọc_số_trùng_trong_cột.value}, số cùng hàng = ${lọc_số_cùng_hàng.value} (-1 là không lọc)`,
+  )
 
   let tong_3 = 0
   let tong_4 = 0
@@ -415,6 +469,29 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
   const tập_vị_trí: Vị_Trí_Lặp_Lại[] = []
   const tất_cả_ds_vị_trí_dự_đoán: number[][] = []
 
+  // tra cứu theo (mức trùng, tập vị trí đã sắp xếp) thay vì find + sort trên toàn bộ tập_vị_trí
+  const chỉ_mục_vị_trí = new Map<string, Vị_Trí_Lặp_Lại>()
+  const ghi_nhận_vị_trí_lặp_lại = (trùng: number, ds_vị_trí: number[], k: number, i: number) => {
+    const ds_đã_sắp_xếp = [...ds_vị_trí].sort((a, b) => a - b)
+    const khóa = `${trùng}|${ds_đã_sắp_xếp.join(',')}`
+    const vị_trí_tồn_tại = chỉ_mục_vị_trí.get(khóa)
+    if (vị_trí_tồn_tại) {
+      vị_trí_tồn_tại.tổng_xuất_hiện += 1
+      vị_trí_tồn_tại.xuất_hiện.push(k)
+      vị_trí_tồn_tại.danh_sách.push(i)
+    } else {
+      const vị_trí_mới: Vị_Trí_Lặp_Lại = {
+        ds_vị_trí: ds_đã_sắp_xếp,
+        tổng_xuất_hiện: 1,
+        trùng,
+        xuất_hiện: [k],
+        danh_sách: [i],
+      }
+      tập_vị_trí.push(vị_trí_mới)
+      chỉ_mục_vị_trí.set(khóa, vị_trí_mới)
+    }
+  }
+
   for (let k = danh_sách_dữ_liệu.length - 1; k >= 0; k--) {
     const dữ_liệu = danh_sách_dữ_liệu[k]
     const kết_quả_xổ_số = dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số || []
@@ -423,73 +500,29 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
     for (let i = 0; i < dự_đoán_ds_xuất_hiện.length; i++) {
       const danh_sách = dự_đoán_ds_xuất_hiện[i]
 
+      // vòng j chạy hàng trăm triệu lần nên tính trước vị trí nào của danh sách có trong kết quả
+      const vị_trí_trúng = new Uint8Array(danh_sách.length)
+      danh_sách.forEach((số, vị_trí) => {
+        if (kết_quả_xổ_số.includes(số)) vị_trí_trúng[vị_trí] = 1
+      })
+
       for (let j = 0; j < tất_cả_ds_vị_trí_dự_đoán.length; j++) {
-        const ds_dự_đoán: string[] = []
         const ds_vị_trí = tất_cả_ds_vị_trí_dự_đoán[j]
-        ds_vị_trí.forEach((vị_trí) => {
-          ds_dự_đoán.push(danh_sách[vị_trí])
-        })
-        const tổng = ds_dự_đoán.filter((số) => kết_quả_xổ_số.includes(số)).length
+        let tổng = 0
+        for (let m = 0; m < ds_vị_trí.length; m++) {
+          tổng += vị_trí_trúng[ds_vị_trí[m]] | 0
+        }
         if (tổng === 5) {
-          if (ds_vị_trí.includes(Number(dữ_liệu.số_jacpot_2))) {
-            const vị_trí_tồn_tại = tập_vị_trí.find(
-              (vị_trí) =>
-                vị_trí.ds_vị_trí.sort().toString() === ds_vị_trí.sort().toString() &&
-                vị_trí.trùng === 5.5,
-            )
-            if (vị_trí_tồn_tại) {
-              vị_trí_tồn_tại.tổng_xuất_hiện += 1
-              vị_trí_tồn_tại.xuất_hiện.push(k)
-              vị_trí_tồn_tại.danh_sách.push(i)
-            } else {
-              tập_vị_trí.push({
-                ds_vị_trí: ds_vị_trí,
-                tổng_xuất_hiện: 1,
-                trùng: 5.5,
-                xuất_hiện: [k],
-                danh_sách: [i],
-              })
-            }
-          } else {
-            const vị_trí_tồn_tại = tập_vị_trí.find(
-              (vị_trí) =>
-                vị_trí.ds_vị_trí.sort().toString() === ds_vị_trí.sort().toString() &&
-                vị_trí.trùng === 5,
-            )
-            if (vị_trí_tồn_tại) {
-              vị_trí_tồn_tại.tổng_xuất_hiện += 1
-              vị_trí_tồn_tại.xuất_hiện.push(k)
-              vị_trí_tồn_tại.danh_sách.push(i)
-            } else {
-              tập_vị_trí.push({
-                ds_vị_trí: ds_vị_trí,
-                tổng_xuất_hiện: 1,
-                trùng: 5,
-                xuất_hiện: [k],
-                danh_sách: [i],
-              })
-            }
-          }
+          // 6/45 không có jackpot 2 nên chỉ loại 55 mới có mức 5.5
+          ghi_nhận_vị_trí_lặp_lại(
+            dữ_liệu.loại_xổ_số === 55 && ds_vị_trí.includes(Number(dữ_liệu.số_jacpot_2)) ? 5.5 : 5,
+            ds_vị_trí,
+            k,
+            i,
+          )
         }
         if (tổng === 6) {
-          const vị_trí_tồn_tại = tập_vị_trí.find(
-            (vị_trí) =>
-              vị_trí.ds_vị_trí.sort().toString() === ds_vị_trí.sort().toString() &&
-              vị_trí.trùng === 6,
-          )
-          if (vị_trí_tồn_tại) {
-            vị_trí_tồn_tại.tổng_xuất_hiện += 1
-            vị_trí_tồn_tại.xuất_hiện.push(k)
-            vị_trí_tồn_tại.danh_sách.push(i)
-          } else {
-            tập_vị_trí.push({
-              ds_vị_trí: ds_vị_trí,
-              tổng_xuất_hiện: 1,
-              trùng: 6,
-              xuất_hiện: [k],
-              danh_sách: [i],
-            })
-          }
+          ghi_nhận_vị_trí_lặp_lại(6, ds_vị_trí, k, i)
         }
       }
     }
@@ -629,6 +662,41 @@ function chạy_backtest_và_in_kết_quả(danh_sách_dữ_liệu: Array<Đối
   console.groupEnd()
 }
 
+function tạo_và_in_vé_kỳ_tới(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
+  const loại_xổ_số = danh_sách_dữ_liệu[0].loại_xổ_số
+  const chiến_lược = CÁC_CHIẾN_LƯỢC[chiến_lược_vé.value]
+  if (!chiến_lược) {
+    console.warn('Chọn một chiến lược cụ thể để tạo vé')
+    return
+  }
+  const số_vé = SỐ_VÉ_MỤC_TIÊU[loại_xổ_số]
+  const vé = tạo_danh_sách_vé(loại_xổ_số, số_vé, chiến_lược(danh_sách_dữ_liệu, loại_xổ_số))
+
+  console.group(`Vé kỳ tới ${loại_xổ_số} (${chiến_lược_vé.value})`)
+  console.log(
+    `${vé.length}/${số_vé} vé, xác suất có vé trúng từ 5 số: ${(vé.length * xác_suất_một_vé(loại_xổ_số).từ_5 * 100).toFixed(3)}%`,
+  )
+  console.log(vé.map((một_vé) => một_vé.map((số) => String(số).padStart(2, '0')).join(' ')).join('\n'))
+  console.groupEnd()
+}
+
+async function chạy_backtest_vé(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
+  const loại_xổ_số = danh_sách_dữ_liệu[0].loại_xổ_số
+  const danh_sách_chiến_lược =
+    chiến_lược_vé.value === TẤT_CẢ_CHIẾN_LƯỢC ? Object.keys(CÁC_CHIẾN_LƯỢC) : [chiến_lược_vé.value]
+
+  console.group(`Backtest vé ${loại_xổ_số}: ${SỐ_VÉ_MỤC_TIÊU[loại_xổ_số]} vé mỗi kỳ`)
+  const các_dòng = []
+  for (const chiến_lược of danh_sách_chiến_lược) {
+    // nhường luồng giữa các chiến lược để trang không bị treo
+    await new Promise((giải_quyết) => setTimeout(giải_quyết))
+    các_dòng.push(backtest_bộ_vé(danh_sách_dữ_liệu, chiến_lược))
+  }
+  console.table(các_dòng)
+  console.log('z dưới 2 là chưa kết luận được gì (kỳ vọng chỉ cỡ chục kỳ trúng)')
+  console.groupEnd()
+}
+
 function tạo_và_in_bộ_vé(loại_xổ_số: number) {
   try {
     const bộ_vé = tạo_bộ_vé_phủ(
@@ -747,26 +815,40 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
           </div>
         </div>
         <div>Hiển thị chi tiết: <input v-model="có_hiển_thị_chi_tiết" type="checkbox" /></div>
+        <template v-if="có_hiển_thị_chi_tiết">
+          <div>
+            Lọc ít nhất
+            <select v-model="lọc_số_trùng_trong_cột">
+              <option v-for="giá_trị in [-1, 1, 2, 3]" :key="giá_trị" :value="giá_trị">
+                {{ giá_trị }}
+              </option>
+            </select>
+            cột có từ 2 số trở lên
+          </div>
+          <div>
+            Lọc có hàng chứa đúng
+            <select v-model="lọc_số_cùng_hàng">
+              <option v-for="giá_trị in [-1, 2, 3, 4]" :key="giá_trị" :value="giá_trị">
+                {{ giá_trị }}
+              </option>
+            </select>
+            số (điều kiện or, -1 là không lọc)
+          </div>
+        </template>
       </div>
 
       <div>
         <div>
-          <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán 55</button>
-          <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_45)">thống kê dự đoán 45</button>
-          <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_55)">backtest 55</button>
-          <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_45)">backtest 45</button>
-          <button @click="chạy_phân_tích_ghép_chéo()">ghép chéo 45/55</button>
           <div>
-            bộ vé phủ: nhóm
-            <input v-model="kích_thước_nhóm_số" type="text" :style="{ width: '20px' }" />
-            số, đảm bảo trúng
-            <input v-model="mức_đảm_bảo_trúng" type="text" :style="{ width: '20px' }" />
-            số
-            <button @click="tạo_và_in_bộ_vé(55)">tạo vé 55</button>
-            <button @click="tạo_và_in_bộ_vé(45)">tạo vé 45</button>
+            <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán 55</button>
+            <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_45)">thống kê dự đoán 45</button>
+            để lưu vào indexed DB
           </div>
-          để lưu vào
-          indexed DB
+          <div>
+            <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_55)">backtest 55</button>
+            <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_45)">backtest 45</button>
+            <button @click="chạy_phân_tích_ghép_chéo()">ghép chéo 45/55</button>
+          </div>
           <div>
             từ Indexed DB<button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55)">
               phân tích và dự đoán 55</button
@@ -805,6 +887,28 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
           xem bao nhiêu:
           <input v-model="chu_kỳ_số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
           <button @click="lọc_dữ_liệu_theo_số_lần_xuất_hiện()">Lọc</button>
+        </div>
+        <div>
+          bộ vé phủ: nhóm
+          <input v-model="kích_thước_nhóm_số" type="text" :style="{ width: '20px' }" />
+          số, đảm bảo trúng
+          <input v-model="mức_đảm_bảo_trúng" type="text" :style="{ width: '20px' }" />
+          số
+          <button @click="tạo_và_in_bộ_vé(55)">tạo vé 55</button>
+          <button @click="tạo_và_in_bộ_vé(45)">tạo vé 45</button>
+        </div>
+        <div>
+          vé mục tiêu (55: {{ SỐ_VÉ_MỤC_TIÊU[55] }}, 45: {{ SỐ_VÉ_MỤC_TIÊU[45] }}) chiến lược
+          <select v-model="chiến_lược_vé">
+            <option v-for="tên in Object.keys(CÁC_CHIẾN_LƯỢC)" :key="tên" :value="tên">
+              {{ tên }}
+            </option>
+            <option :value="TẤT_CẢ_CHIẾN_LƯỢC">{{ TẤT_CẢ_CHIẾN_LƯỢC }} (chỉ backtest)</option>
+          </select>
+          <button @click="tạo_và_in_vé_kỳ_tới(dữ_liệu_xổ_số_55)">vé kỳ tới 55</button>
+          <button @click="tạo_và_in_vé_kỳ_tới(dữ_liệu_xổ_số_45)">vé kỳ tới 45</button>
+          <button @click="chạy_backtest_vé(dữ_liệu_xổ_số_55)">backtest vé 55</button>
+          <button @click="chạy_backtest_vé(dữ_liệu_xổ_số_45)">backtest vé 45</button>
         </div>
       </div>
     </div>
