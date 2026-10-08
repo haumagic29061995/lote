@@ -7,6 +7,7 @@ import { lấy_dữ_liệu_xổ_số_45, lấy_dữ_liệu_xổ_số_55, tạo_d
 import { chạy_backtest } from '@/composables/backtest'
 import { phân_tích_ghép_chéo } from '@/composables/cross-analysis'
 import { tạo_bộ_vé_phủ } from '@/composables/ticket-optimizer'
+import { tạo_bộ_vị_trí_cố_định, tạo_vé_từ_danh_sách } from '@/composables/position-ticket'
 import {
   backtest_bộ_vé,
   CÁC_CHIẾN_LƯỢC,
@@ -111,6 +112,8 @@ function qua_bộ_lọc_vị_trí(ds_vị_trí: number[]): boolean {
   )
 }
 
+const chỉ_số_ds_tạo_vé = ref<number>(0)
+const số_vé_từ_danh_sách = ref<number>(3000)
 const chiến_lược_vé = ref<string>('ngẫu_nhiên')
 const TẤT_CẢ_CHIẾN_LƯỢC = 'tất_cả'
 const kích_thước_nhóm_số = ref<number>(12)
@@ -662,6 +665,29 @@ function chạy_backtest_và_in_kết_quả(danh_sách_dữ_liệu: Array<Đối
   console.groupEnd()
 }
 
+// công thức cố định: cùng một bộ vị trí áp lên danh sách xuất hiện của kỳ mới nhất
+function tạo_và_in_vé_từ_danh_sách(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
+  const dữ_liệu = danh_sách_dữ_liệu[0]
+  const chỉ_số = Number(chỉ_số_ds_tạo_vé.value)
+  const danh_sách = dữ_liệu.dự_đoán_ds_xuất_hiện[chỉ_số]
+  if (!danh_sách) {
+    console.warn(
+      `Không có danh sách số ${chỉ_số}: kỳ mới nhất của ${dữ_liệu.loại_xổ_số} có ${dữ_liệu.dự_đoán_ds_xuất_hiện.length} danh sách (chỉ số từ 0)`,
+    )
+    return
+  }
+
+  const số_vé = Number(số_vé_từ_danh_sách.value)
+  const bộ_vị_trí = tạo_bộ_vị_trí_cố_định(danh_sách.length, số_vé)
+  const vé = tạo_vé_từ_danh_sách(danh_sách, bộ_vị_trí)
+
+  console.group(`Vé từ danh sách ${chỉ_số} của ${dữ_liệu.loại_xổ_số} (${danh_sách.length} số)`)
+  console.log(`${vé.length}/${số_vé} vé, mỗi vé có ít nhất 1 cột từ 2 số, mỗi hàng tối đa 3 số`)
+  if (vé.length < số_vé) console.warn('Không tạo đủ số vé với điều kiện này')
+  console.log(vé.map((một_vé) => một_vé.join(' ')).join('\n'))
+  console.groupEnd()
+}
+
 function tạo_và_in_vé_kỳ_tới(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
   const loại_xổ_số = danh_sách_dữ_liệu[0].loại_xổ_số
   const chiến_lược = CÁC_CHIẾN_LƯỢC[chiến_lược_vé.value]
@@ -909,6 +935,15 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
           <button @click="tạo_và_in_vé_kỳ_tới(dữ_liệu_xổ_số_45)">vé kỳ tới 45</button>
           <button @click="chạy_backtest_vé(dữ_liệu_xổ_số_55)">backtest vé 55</button>
           <button @click="chạy_backtest_vé(dữ_liệu_xổ_số_45)">backtest vé 45</button>
+        </div>
+        <div>
+          vé từ danh sách xuất hiện (công thức cố định, ít nhất 1 cột 2 số, mỗi hàng tối đa 3 số):
+          danh sách
+          <input v-model="chỉ_số_ds_tạo_vé" type="text" :style="{ width: '20px' }" />
+          số vé
+          <input v-model="số_vé_từ_danh_sách" type="text" :style="{ width: '40px' }" />
+          <button @click="tạo_và_in_vé_từ_danh_sách(dữ_liệu_xổ_số_55)">tạo 55</button>
+          <button @click="tạo_và_in_vé_từ_danh_sách(dữ_liệu_xổ_số_45)">tạo 45</button>
         </div>
       </div>
     </div>
