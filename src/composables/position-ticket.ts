@@ -1,4 +1,13 @@
+import {
+  CÁC_MỨC_TRÚNG,
+  GIẢI_THƯỞNG,
+  GIÁ_VÉ_THỰC_TẾ,
+  tiền_thực_nhận,
+  xác_suất_ngẫu_nhiên,
+  type Mức_Trúng,
+} from '@/composables/backtest'
 import { tạo_bộ_sinh_ngẫu_nhiên } from '@/composables/ticket-portfolio'
+import type { Đối_Tượng_Xổ_Số } from '@/types/lote'
 
 const SỐ_VỊ_TRÍ_MỖI_VÉ = 6
 const SỐ_VỊ_TRÍ_MỖI_HÀNG = 6
@@ -76,4 +85,75 @@ export function tạo_bộ_vị_trí_cố_định(số_vị_trí: number, số_v
 // Áp bộ vị trí cố định lên một danh sách xuất hiện cụ thể để ra các vé (mỗi vé là 6 số)
 export function tạo_vé_từ_danh_sách(danh_sách: string[], bộ_vị_trí: number[][]): string[][] {
   return bộ_vị_trí.map((ds_vị_trí) => ds_vị_trí.map((vị_trí) => danh_sách[vị_trí]).sort())
+}
+
+export type Vé_Trúng = { vé: string[]; số_trúng: number; số_trùng: string[]; mức: Mức_Trúng }
+
+export type Đánh_Giá_Bộ_Vé = {
+  dòng_theo_mức: Array<{
+    mức_trúng: Mức_Trúng
+    số_vé: number
+    kỳ_vọng_ngẫu_nhiên: number
+    tiền_mỗi_vé: number
+    tiền: number
+  }>
+  chi_phí: number
+  tiền_thắng: number
+  lãi_lỗ: number
+  vé_trúng_từ_4: Vé_Trúng[]
+}
+
+/**
+ * So bộ vé với kết quả thật của `kỳ_sau`. Tiền thắng đã trừ thuế, chi phí đã gồm phí mua vé.
+ * Trúng 5 số mà vé có số phụ (chỉ loại 55) là jackpot 2.
+ */
+export function đánh_giá_bộ_vé(vé: string[][], kỳ_sau: Đối_Tượng_Xổ_Số): Đánh_Giá_Bộ_Vé {
+  const loại_xổ_số = kỳ_sau.loại_xổ_số
+  const có_jackpot_2 = loại_xổ_số === 55
+  const tập_kết_quả = new Set(kỳ_sau.kết_quả_xổ_số)
+  const giải = GIẢI_THƯỞNG[loại_xổ_số] ?? GIẢI_THƯỞNG[45]
+  const xác_suất = xác_suất_ngẫu_nhiên(loại_xổ_số === 55 ? 55 : 45, có_jackpot_2)
+
+  const số_vé_theo_mức = Object.fromEntries(CÁC_MỨC_TRÚNG.map((mức) => [mức, 0])) as Record<
+    Mức_Trúng,
+    number
+  >
+  const vé_trúng_từ_4: Vé_Trúng[] = []
+
+  vé.forEach((một_vé) => {
+    const số_trùng = một_vé.filter((số) => tập_kết_quả.has(số))
+    const số_trúng = số_trùng.length
+    let mức: Mức_Trúng | undefined
+    if (số_trúng === 3) mức = 'trúng_3'
+    else if (số_trúng === 4) mức = 'trúng_4'
+    else if (số_trúng === 5) {
+      mức = có_jackpot_2 && một_vé.includes(kỳ_sau.số_jacpot_2) ? 'jackpot_2' : 'trúng_5'
+    } else if (số_trúng === 6) mức = 'jackpot_1'
+    if (!mức) return
+    số_vé_theo_mức[mức]++
+    if (số_trúng >= 4) vé_trúng_từ_4.push({ vé: một_vé, số_trúng, số_trùng, mức })
+  })
+
+  let tiền_thắng = 0
+  const dòng_theo_mức = CÁC_MỨC_TRÚNG.map((mức_trúng) => {
+    const tiền_mỗi_vé = tiền_thực_nhận(giải[mức_trúng])
+    const tiền = số_vé_theo_mức[mức_trúng] * tiền_mỗi_vé
+    tiền_thắng += tiền
+    return {
+      mức_trúng,
+      số_vé: số_vé_theo_mức[mức_trúng],
+      kỳ_vọng_ngẫu_nhiên: Number((vé.length * xác_suất[mức_trúng]).toFixed(2)),
+      tiền_mỗi_vé,
+      tiền,
+    }
+  })
+
+  const chi_phí = vé.length * GIÁ_VÉ_THỰC_TẾ
+  return {
+    dòng_theo_mức,
+    chi_phí,
+    tiền_thắng,
+    lãi_lỗ: tiền_thắng - chi_phí,
+    vé_trúng_từ_4: vé_trúng_từ_4.sort((a, b) => b.số_trúng - a.số_trúng),
+  }
 }

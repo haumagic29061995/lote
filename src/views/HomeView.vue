@@ -7,7 +7,11 @@ import { lấy_dữ_liệu_xổ_số_45, lấy_dữ_liệu_xổ_số_55, tạo_d
 import { chạy_backtest } from '@/composables/backtest'
 import { phân_tích_ghép_chéo } from '@/composables/cross-analysis'
 import { tạo_bộ_vé_phủ } from '@/composables/ticket-optimizer'
-import { tạo_bộ_vị_trí_cố_định, tạo_vé_từ_danh_sách } from '@/composables/position-ticket'
+import {
+  đánh_giá_bộ_vé,
+  tạo_bộ_vị_trí_cố_định,
+  tạo_vé_từ_danh_sách,
+} from '@/composables/position-ticket'
 import {
   backtest_bộ_vé,
   CÁC_CHIẾN_LƯỢC,
@@ -112,6 +116,7 @@ function qua_bộ_lọc_vị_trí(ds_vị_trí: number[]): boolean {
   )
 }
 
+const vị_trí_kỳ_tạo_vé = ref<number>(0)
 const chỉ_số_ds_tạo_vé = ref<number>(0)
 const số_vé_từ_danh_sách = ref<number>(3000)
 const chiến_lược_vé = ref<string>('ngẫu_nhiên')
@@ -665,14 +670,19 @@ function chạy_backtest_và_in_kết_quả(danh_sách_dữ_liệu: Array<Đối
   console.groupEnd()
 }
 
-// công thức cố định: cùng một bộ vị trí áp lên danh sách xuất hiện của kỳ mới nhất
+// công thức cố định: cùng một bộ vị trí áp lên danh sách xuất hiện của kỳ đã chọn (0 là kỳ mới nhất)
 function tạo_và_in_vé_từ_danh_sách(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
-  const dữ_liệu = danh_sách_dữ_liệu[0]
+  const vị_trí_kỳ = Number(vị_trí_kỳ_tạo_vé.value)
+  const dữ_liệu = danh_sách_dữ_liệu[vị_trí_kỳ]
+  if (!dữ_liệu) {
+    console.warn(`Không có kỳ ở vị trí ${vị_trí_kỳ} (có ${danh_sách_dữ_liệu.length} kỳ, từ 0)`)
+    return
+  }
   const chỉ_số = Number(chỉ_số_ds_tạo_vé.value)
   const danh_sách = dữ_liệu.dự_đoán_ds_xuất_hiện[chỉ_số]
   if (!danh_sách) {
     console.warn(
-      `Không có danh sách số ${chỉ_số}: kỳ mới nhất của ${dữ_liệu.loại_xổ_số} có ${dữ_liệu.dự_đoán_ds_xuất_hiện.length} danh sách (chỉ số từ 0)`,
+      `Không có danh sách số ${chỉ_số}: kỳ ở vị trí ${vị_trí_kỳ} của ${dữ_liệu.loại_xổ_số} có ${dữ_liệu.dự_đoán_ds_xuất_hiện.length} danh sách (chỉ số từ 0)`,
     )
     return
   }
@@ -681,9 +691,38 @@ function tạo_và_in_vé_từ_danh_sách(danh_sách_dữ_liệu: Array<Đối_T
   const bộ_vị_trí = tạo_bộ_vị_trí_cố_định(danh_sách.length, số_vé)
   const vé = tạo_vé_từ_danh_sách(danh_sách, bộ_vị_trí)
 
-  console.group(`Vé từ danh sách ${chỉ_số} của ${dữ_liệu.loại_xổ_số} (${danh_sách.length} số)`)
+  console.group(
+    `Vé từ danh sách ${chỉ_số} của kỳ ${vị_trí_kỳ} (${dữ_liệu.ngày_xổ_số}) ${dữ_liệu.loại_xổ_số} (${danh_sách.length} số)`,
+  )
   console.log(`${vé.length}/${số_vé} vé, mỗi vé có ít nhất 1 cột từ 2 số, mỗi hàng tối đa 3 số`)
   if (vé.length < số_vé) console.warn('Không tạo đủ số vé với điều kiện này')
+
+  // kỳ cũ thì đã có kết quả của kỳ sau để đánh giá bộ vé
+  const kỳ_sau = dữ_liệu.dữ_liệu_kỳ_sau_đó
+  if (kỳ_sau) {
+    const đánh_giá = đánh_giá_bộ_vé(vé, kỳ_sau)
+    const định_dạng_tiền = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+
+    console.group(`Đánh giá ${vé.length} vé với kết quả kỳ sau (${kỳ_sau.ngày_xổ_số})`)
+    console.log(
+      `kết quả: ${kỳ_sau.kết_quả_xổ_số.join(' ')}${kỳ_sau.số_jacpot_2 ? ` | số phụ: ${kỳ_sau.số_jacpot_2}` : ''}`,
+    )
+    console.table(đánh_giá.dòng_theo_mức)
+    console.log(
+      `chi phí (đã gồm phí 3%): ${định_dạng_tiền.format(đánh_giá.chi_phí)}, tiền thắng (đã trừ thuế): ${định_dạng_tiền.format(đánh_giá.tiền_thắng)}, lãi/lỗ: ${định_dạng_tiền.format(đánh_giá.lãi_lỗ)}`,
+    )
+    if (đánh_giá.vé_trúng_từ_4.length > 0) {
+      console.log(
+        'vé trúng từ 4 số:\n' +
+          đánh_giá.vé_trúng_từ_4
+            .map((vé_trúng) => `${vé_trúng.vé.join(' ')} → ${vé_trúng.số_trúng} số (${vé_trúng.mức})`)
+            .join('\n'),
+      )
+    }
+    console.groupEnd()
+  } else {
+    console.log('kỳ mới nhất, chưa có kết quả kỳ sau để đánh giá')
+  }
   console.log(vé.map((một_vé) => một_vé.join(' ')).join('\n'))
   console.groupEnd()
 }
@@ -938,6 +977,8 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
         </div>
         <div>
           vé từ danh sách xuất hiện (công thức cố định, ít nhất 1 cột 2 số, mỗi hàng tối đa 3 số):
+          kỳ
+          <input v-model="vị_trí_kỳ_tạo_vé" type="text" :style="{ width: '30px' }" />
           danh sách
           <input v-model="chỉ_số_ds_tạo_vé" type="text" :style="{ width: '20px' }" />
           số vé

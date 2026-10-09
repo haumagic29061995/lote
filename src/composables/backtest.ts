@@ -2,11 +2,19 @@ import type { Đối_Tượng_Xổ_Số } from '@/types/lote'
 
 export type Mức_Trúng = 'trúng_3' | 'trúng_4' | 'trúng_5' | 'jackpot_2' | 'jackpot_1'
 
-const CÁC_MỨC_TRÚNG: Mức_Trúng[] = ['trúng_3', 'trúng_4', 'trúng_5', 'jackpot_2', 'jackpot_1']
+export const CÁC_MỨC_TRÚNG: Mức_Trúng[] = ['trúng_3', 'trúng_4', 'trúng_5', 'jackpot_2', 'jackpot_1']
 
 // Giá vé và giá trị giải (VND). Jackpot dùng mức tối thiểu công bố, thực tế có thể cao hơn.
-const GIÁ_VÉ = 10000
-const GIẢI_THƯỞNG: Record<number, Record<Mức_Trúng, number>> = {
+export const GIÁ_VÉ = 10000
+// phí mua vé 3% và thuế 10% phần giải vượt 10 triệu (40 triệu thì nộp 3 triệu)
+export const PHÍ_MUA_VÉ = 0.03
+export const GIÁ_VÉ_THỰC_TẾ = GIÁ_VÉ * (1 + PHÍ_MUA_VÉ)
+const NGƯỠNG_THUẾ = 10_000_000
+export function tiền_thực_nhận(giải: number): number {
+  return giải > NGƯỠNG_THUẾ ? giải - 0.1 * (giải - NGƯỠNG_THUẾ) : giải
+}
+
+export const GIẢI_THƯỞNG: Record<number, Record<Mức_Trúng, number>> = {
   45: {
     trúng_3: 30_000,
     trúng_4: 300_000,
@@ -51,7 +59,7 @@ function tổ_hợp(n: number, k: number): number {
 }
 
 // Xác suất ngẫu nhiên của 1 vé 6 số (trong 1..tổng_số) ở mỗi mức trúng
-function xác_suất_ngẫu_nhiên(tổng_số: number, có_jackpot_2: boolean): Record<Mức_Trúng, number> {
+export function xác_suất_ngẫu_nhiên(tổng_số: number, có_jackpot_2: boolean): Record<Mức_Trúng, number> {
   const tất_cả = tổ_hợp(tổng_số, 6)
   const đúng_k = (k: number) => (tổ_hợp(6, k) * tổ_hợp(tổng_số - 6, 6 - k)) / tất_cả
   const jackpot_2 = có_jackpot_2 ? 6 / tất_cả : 0
