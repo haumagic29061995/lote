@@ -71,7 +71,8 @@ const bù_trừ_cho_loại_xổ_số_55: number = mở_xổ_số_loại_tiếp_t
 
 const các_tùy_chọn_để_hiển_thị_dữ_liệu = ref<number[]>([])
 const số_dữ_liệu_sẽ_được_hiển_thị = ref<number>(7)
-
+const đơn_vị = ref<number>(1)
+const đơn_vị_được_dự_đoán = ref<number>(0)
 const có_hiển_thị_chi_tiết = ref<boolean>(false)
 
 // bộ lọc bộ vị trí khi xem dự đoán; -1 là không lọc, hai điều kiện đặt cùng lúc thì chỉ cần thỏa một (or)
@@ -413,7 +414,9 @@ function xem_dự_đoán_cho_tất_cả(
   // lấy tất cả vị trí dự đoán
   for (let k = dữ_liệu.vị_trí_dữ_liệu + 1; k < danh_sách_dữ_liệu.length; k++) {
     const dữ_liệu_tiếp_theo = danh_sách_dữ_liệu[k]
-    tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu_tiếp_theo.vị_trí_ds_xuất_hiện.filter(qua_bộ_lọc_vị_trí))
+    tất_cả_ds_vị_trí_dự_đoán.push(
+      ...dữ_liệu_tiếp_theo.vị_trí_ds_xuất_hiện.filter(qua_bộ_lọc_vị_trí),
+    )
   }
 
   console.log('tất cả vị trí dự đoán: ', tất_cả_ds_vị_trí_dự_đoán.length)
@@ -715,7 +718,9 @@ function tạo_và_in_vé_từ_danh_sách(danh_sách_dữ_liệu: Array<Đối_T
       console.log(
         'vé trúng từ 4 số:\n' +
           đánh_giá.vé_trúng_từ_4
-            .map((vé_trúng) => `${vé_trúng.vé.join(' ')} → ${vé_trúng.số_trúng} số (${vé_trúng.mức})`)
+            .map(
+              (vé_trúng) => `${vé_trúng.vé.join(' ')} → ${vé_trúng.số_trúng} số (${vé_trúng.mức})`,
+            )
             .join('\n'),
       )
     }
@@ -741,7 +746,9 @@ function tạo_và_in_vé_kỳ_tới(danh_sách_dữ_liệu: Array<Đối_Tượ
   console.log(
     `${vé.length}/${số_vé} vé, xác suất có vé trúng từ 5 số: ${(vé.length * xác_suất_một_vé(loại_xổ_số).từ_5 * 100).toFixed(3)}%`,
   )
-  console.log(vé.map((một_vé) => một_vé.map((số) => String(số).padStart(2, '0')).join(' ')).join('\n'))
+  console.log(
+    vé.map((một_vé) => một_vé.map((số) => String(số).padStart(2, '0')).join(' ')).join('\n'),
+  )
   console.groupEnd()
 }
 
@@ -792,7 +799,9 @@ function chạy_phân_tích_ghép_chéo() {
     console.log(`loại ${kết_quả.loại_xổ_số}: ${kết_quả.số_bộ_ba_kỳ} bộ ba kỳ (A, B, C)`)
     console.table(kết_quả.các_dòng)
   })
-  console.log('A: kỳ trước cùng loại; B: kỳ khác loại nằm giữa; C: kỳ cần dự đoán. z > 3: có tín hiệu')
+  console.log(
+    'A: kỳ trước cùng loại; B: kỳ khác loại nằm giữa; C: kỳ cần dự đoán. z > 3: có tín hiệu',
+  )
   console.groupEnd()
 }
 
@@ -801,7 +810,9 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
   const số_lần_xuất_hiện = Number(số_xuất_hiện_nhiều_lần.value)
   const từ_vị_trí = Number(từ_vị_trí_số_xuất_hiện_nhiều_lần.value)
   const chu_kỳ = Number(chu_kỳ_số_xuất_hiện_nhiều_lần.value)
-  for (let i = từ_vị_trí; i < 100; i++) {
+  let tổng_số = 0
+  console.group('Số xuất hiện nhiều lần')
+  for (let i = từ_vị_trí; i < 3000; i++) {
     const danh_sách_số_lần_xuất_hiện = new Set<string>()
     dữ_liệu_xổ_số_55.slice(i, i + chu_kỳ).forEach((dữ_liệu) => {
       dữ_liệu.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.forEach((mục) => {
@@ -814,12 +825,65 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
     const tổng = dữ_liệu_xổ_số_55[vị_trí_xem].kết_quả_xổ_số.filter((số) =>
       danh_sách_số_lần_xuất_hiện.has(số),
     ).length
-    if (danh_sách_số_lần_xuất_hiện.size >= 6 && tổng >= 2) {
-      console.group('Số xuất hiện nhiều lần')
-      console.log([...danh_sách_số_lần_xuất_hiện.values()].join(', '))
-      console.log(`tổng số trùng với kết quả xổ số tại vị trí ${vị_trí_xem}: ${tổng}`)
-      console.groupEnd()
+    if (danh_sách_số_lần_xuất_hiện.size >= 6) {
+      tổng_số++
+      if (tổng >= 3) {
+        console.log([...danh_sách_số_lần_xuất_hiện.values()].join(', '))
+        console.log(`tổng số trùng với kết quả xổ số tại vị trí ${vị_trí_xem}: ${tổng}`)
+      }
     }
+  }
+  console.log('tổng số dự đoán: ', tổng_số)
+
+  console.groupEnd()
+}
+
+function dự_đoán_bằng_cách_tăng(loại: number) {
+  const giá_trị_đơn_vị = Number(đơn_vị.value)
+  const giá_trị_được_dự_đoán = Number(đơn_vị_được_dự_đoán.value)
+  const danh_sách_dữ_liệu = loại === 55 ? dữ_liệu_xổ_số_55 : dữ_liệu_xổ_số_45
+  const số_giống_kết_quả = new Set<number>()
+  const tổng_số_dự_đoán = new Set<number>()
+
+  if (giá_trị_được_dự_đoán < 0) {
+    for (let i = giá_trị_được_dự_đoán + 1; i < giá_trị_được_dự_đoán + 11; i++) {
+      const dữ_liệu_dự_đoán2 = danh_sách_dữ_liệu[i]
+      const danh_sách_dự_đoán = dữ_liệu_dự_đoán2.kết_quả_xổ_số.map((số) => {
+        let số_mới = (Number(số) + giá_trị_đơn_vị) % loại
+        số_mới = số_mới === 0 ? loại : số_mới
+        tổng_số_dự_đoán.add(số_mới)
+        return số_mới
+      })
+      console.log(`dự đoán kỳ ${dữ_liệu_dự_đoán2.ngày_xổ_số}: ${danh_sách_dự_đoán.join(', ')}`)
+    }
+  } else {
+    const dữ_liệu_dự_đoán = danh_sách_dữ_liệu[giá_trị_được_dự_đoán]
+    const danh_sách_đánh_giá = dữ_liệu_dự_đoán.kết_quả_xổ_số
+    for (let i = giá_trị_được_dự_đoán + 1; i < danh_sách_dữ_liệu.length; i++) {
+      const dữ_liệu_dự_đoán2 = danh_sách_dữ_liệu[i]
+      const danh_sách_dự_đoán = dữ_liệu_dự_đoán2.kết_quả_xổ_số.map((số) => {
+        let số_mới = (Number(số) + giá_trị_đơn_vị) % loại
+        số_mới = số_mới === 0 ? loại : số_mới
+        tổng_số_dự_đoán.add(số_mới)
+        return số_mới
+      })
+      const tổng = danh_sách_đánh_giá.filter((số) => {
+        const có = danh_sách_dự_đoán.includes(Number(số))
+        if (có) {
+          số_giống_kết_quả.add(Number(số))
+        }
+        return có
+      }).length
+      console.log(
+        `dự đoán kỳ ${dữ_liệu_dự_đoán2.ngày_xổ_số}: ${danh_sách_dự_đoán.join(', ')} → trùng ${tổng} số`,
+      )
+    }
+    console.log('các số được dự đoán:', [...số_giống_kết_quả.values()].join(', '))
+    console.log(
+      'các số được dự đoán:',
+      [...tổng_số_dự_đoán.values()].join(', '),
+      tổng_số_dự_đoán.size,
+    )
   }
 }
 </script>
@@ -879,6 +943,13 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
             <input v-model="màu_kết_quả_hiện_tại" type="checkbox" />
           </div>
         </div>
+        <div>
+          <button @click="dự_đoán_bằng_cách_tăng(55)">Dự đoán bằng tăng 55</button>
+          <button @click="dự_đoán_bằng_cách_tăng(45)">Dự đoán bằng tăng 45</button>
+          dự đoán cho:
+          <input v-model="đơn_vị_được_dự_đoán" type="text" :style="{ width: '20px' }" /> đơn vị:
+          <input v-model="đơn_vị" type="text" :style="{ width: '20px' }" />
+        </div>
         <div>Hiển thị chi tiết: <input v-model="có_hiển_thị_chi_tiết" type="checkbox" /></div>
         <template v-if="có_hiển_thị_chi_tiết">
           <div>
@@ -917,7 +988,9 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
           <div>
             từ Indexed DB<button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55)">
               phân tích và dự đoán 55</button
-            ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45)">phân tích và dự đoán 45</button>
+            ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45)">
+              phân tích và dự đoán 45
+            </button>
             chỉ mục
             <input
               type="text"
@@ -939,7 +1012,7 @@ function lọc_dữ_liệu_theo_số_lần_xuất_hiện() {
           </div>
         </div>
         <div>
-          Số Xuất hiện nhiều lần:
+          Số Xuất hiện nhiều lần: vị trí dự đoán:
           <input v-model="vị_trí_xem_số_lần_xuất_hiện" type="text" :style="{ width: '20px' }" />
           bao nhiêu lần:
           <input v-model="số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
