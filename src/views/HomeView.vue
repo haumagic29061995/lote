@@ -981,11 +981,6 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
             để lưu vào indexed DB
           </div>
           <div>
-            <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_55)">backtest 55</button>
-            <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_45)">backtest 45</button>
-            <button @click="chạy_phân_tích_ghép_chéo()">ghép chéo 45/55</button>
-          </div>
-          <div>
             từ Indexed DB<button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55)">
               phân tích và dự đoán 55</button
             ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45)">
@@ -1012,6 +1007,12 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
           </div>
         </div>
         <div>
+          <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_55)">backtest 55</button>
+          <button @click="chạy_backtest_và_in_kết_quả(dữ_liệu_xổ_số_45)">backtest 45</button>
+          <button @click="chạy_phân_tích_ghép_chéo()">ghép chéo 45/55</button>
+        </div>
+        <div>----</div>
+        <div>
           Số Xuất hiện nhiều lần: vị trí dự đoán:
           <input v-model="vị_trí_xem_số_lần_xuất_hiện" type="text" :style="{ width: '20px' }" />
           bao nhiêu lần:
@@ -1026,6 +1027,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
           <input v-model="chu_kỳ_số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
           <button @click="lọc_dữ_liệu_theo_số_lần_xuất_hiện()">Lọc</button>
         </div>
+        <div>----</div>
         <div>
           bộ vé phủ: nhóm
           <input v-model="kích_thước_nhóm_số" type="text" :style="{ width: '20px' }" />
@@ -1035,6 +1037,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
           <button @click="tạo_và_in_bộ_vé(55)">tạo vé 55</button>
           <button @click="tạo_và_in_bộ_vé(45)">tạo vé 45</button>
         </div>
+        <div>----</div>
         <div>
           vé mục tiêu (55: {{ SỐ_VÉ_MỤC_TIÊU[55] }}, 45: {{ SỐ_VÉ_MỤC_TIÊU[45] }}) chiến lược
           <select v-model="chiến_lược_vé">
@@ -1048,6 +1051,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
           <button @click="chạy_backtest_vé(dữ_liệu_xổ_số_55)">backtest vé 55</button>
           <button @click="chạy_backtest_vé(dữ_liệu_xổ_số_45)">backtest vé 45</button>
         </div>
+        <div>----</div>
         <div>
           vé từ danh sách xuất hiện (công thức cố định, ít nhất 1 cột 2 số, mỗi hàng tối đa 3 số):
           kỳ
