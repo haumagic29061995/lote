@@ -45,6 +45,50 @@ export const CÁC_CHIẾN_LƯỢC: Record<string, Chiến_Lược_Trọng_Số> 
   },
 }
 
+export type Thống_Kê_Số = {
+  vừa_ra: string[]
+  nóng: Array<{ số: string; lần: number }>
+  lạnh: Array<{ số: string; lần: number }>
+  lâu_chưa_ra: Array<{ số: string; số_kỳ: number }>
+}
+
+const SỐ_KỲ_THỐNG_KÊ = 50
+const SỐ_LƯỢNG_HIỂN_THỊ = 10
+
+/**
+ * Các thống kê mà chiến lược dùng để lệch trọng số, để xem trước khi tạo vé.
+ * `lịch_sử` có kỳ mới nhất ở đầu mảng. `số_kỳ` của số lâu chưa ra là số kỳ đã qua kể từ lần xuất hiện gần nhất.
+ */
+export function thống_kê_số(
+  lịch_sử: Array<Đối_Tượng_Xổ_Số>,
+  tổng_số: number,
+  số_lượng: number = SỐ_LƯỢNG_HIỂN_THỊ,
+): Thống_Kê_Số {
+  const nhãn = (số: number) => String(số).padStart(2, '0')
+  const đếm = đếm_xuất_hiện(lịch_sử, tổng_số, SỐ_KỲ_THỐNG_KÊ)
+  const khoảng_cách = new Array<number>(tổng_số + 1).fill(lịch_sử.length)
+  for (let i = lịch_sử.length - 1; i >= 0; i--) {
+    lịch_sử[i].kết_quả_xổ_số.forEach((số) => (khoảng_cách[Number(số)] = i))
+  }
+
+  const tất_cả_số = Array.from({ length: tổng_số }, (_, i) => i + 1)
+  return {
+    vừa_ra: lịch_sử[0]?.kết_quả_xổ_số ?? [],
+    nóng: [...tất_cả_số]
+      .sort((a, b) => đếm[b] - đếm[a] || a - b)
+      .slice(0, số_lượng)
+      .map((số) => ({ số: nhãn(số), lần: đếm[số] })),
+    lạnh: [...tất_cả_số]
+      .sort((a, b) => đếm[a] - đếm[b] || a - b)
+      .slice(0, số_lượng)
+      .map((số) => ({ số: nhãn(số), lần: đếm[số] })),
+    lâu_chưa_ra: [...tất_cả_số]
+      .sort((a, b) => khoảng_cách[b] - khoảng_cách[a] || a - b)
+      .slice(0, số_lượng)
+      .map((số) => ({ số: nhãn(số), số_kỳ: khoảng_cách[số] })),
+  }
+}
+
 // bộ sinh số ngẫu nhiên có seed, để backtest lặp lại được cùng kết quả
 export function tạo_bộ_sinh_ngẫu_nhiên(seed: number): () => number {
   let trạng_thái = seed >>> 0

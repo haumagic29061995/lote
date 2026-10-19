@@ -1,3 +1,12 @@
+import moment from 'moment'
+
+const ĐỊNH_DẠNG_NGÀY = 'DD/MM/YYYY'
+
+// bản ghi cũ lưu ngày dạng số mili giây, bản ghi mới lưu dạng chuỗi DD/MM/YYYY
+function chuẩn_hóa_ngày(giá_trị: number | string): string {
+  return typeof giá_trị === 'number' ? moment(giá_trị).format(ĐỊNH_DẠNG_NGÀY) : giá_trị
+}
+
 export type Vị_Trí_Lặp_Lại = {
   ds_vị_trí: number[]
   tổng_xuất_hiện: number
@@ -9,8 +18,8 @@ export type Vị_Trí_Lặp_Lại = {
 export type Bộ_Lưu_Trữ = {
   id: string
   tên: string
-  ngày_tạo: number
-  ngày_cập_nhật: number
+  ngày_tạo: string // DD/MM/YYYY
+  ngày_cập_nhật: string // DD/MM/YYYY
   dữ_liệu: Vị_Trí_Lặp_Lại[]
   kích_thước: number
 }
@@ -20,6 +29,7 @@ class DịchVụIndexedDB {
   private phiên_bản = 1
   private tên_kho_dữ_liệu = 'bộ_lưu_trữ'
   private cơ_sở_dữ_liệu: IDBDatabase | null = null
+  private đã_chuyển_định_dạng_ngày = false
 
   /**
    * Khởi tạo IndexedDB
@@ -31,7 +41,7 @@ class DịchVụIndexedDB {
       yêu_cầu.onerror = () => từ_chối(yêu_cầu.error)
       yêu_cầu.onsuccess = () => {
         this.cơ_sở_dữ_liệu = yêu_cầu.result
-        giải_quyết()
+        this.chuyển_định_dạng_ngày_bản_ghi_cũ().then(giải_quyết, từ_chối)
       }
 
       yêu_cầu.onupgradeneeded = (sự_kiện) => {
@@ -46,6 +56,34 @@ class DịchVụIndexedDB {
   }
 
   /**
+   * Đổi các bản ghi cũ có ngày dạng số sang DD/MM/YYYY (chỉ chạy một lần mỗi lần tải trang)
+   */
+  private async chuyển_định_dạng_ngày_bản_ghi_cũ(): Promise<void> {
+    if (this.đã_chuyển_định_dạng_ngày || !this.cơ_sở_dữ_liệu) return
+    this.đã_chuyển_định_dạng_ngày = true
+
+    await new Promise<void>((giải_quyết, từ_chối) => {
+      const giao_dịch = this.cơ_sở_dữ_liệu!.transaction([this.tên_kho_dữ_liệu], 'readwrite')
+      const yêu_cầu = giao_dịch.objectStore(this.tên_kho_dữ_liệu).openCursor()
+
+      yêu_cầu.onsuccess = () => {
+        const con_trỏ = yêu_cầu.result
+        if (!con_trỏ) return
+        const bộ_lưu_trữ = con_trỏ.value
+        if (typeof bộ_lưu_trữ.ngày_tạo === 'number' || typeof bộ_lưu_trữ.ngày_cập_nhật === 'number') {
+          bộ_lưu_trữ.ngày_tạo = chuẩn_hóa_ngày(bộ_lưu_trữ.ngày_tạo)
+          bộ_lưu_trữ.ngày_cập_nhật = chuẩn_hóa_ngày(bộ_lưu_trữ.ngày_cập_nhật)
+          con_trỏ.update(bộ_lưu_trữ)
+        }
+        con_trỏ.continue()
+      }
+      yêu_cầu.onerror = () => từ_chối(yêu_cầu.error)
+      giao_dịch.oncomplete = () => giải_quyết()
+      giao_dịch.onerror = () => từ_chối(giao_dịch.error)
+    })
+  }
+
+  /**
    * Lưu dữ liệu lặp lại
    */
   async lưu_dữ_liệu(tên: string, dữ_liệu: Vị_Trí_Lặp_Lại[]): Promise<string> {
@@ -55,8 +93,8 @@ class DịchVụIndexedDB {
     const bộ_lưu_trữ: Bộ_Lưu_Trữ = {
       id,
       tên,
-      ngày_tạo: Date.now(),
-      ngày_cập_nhật: Date.now(),
+      ngày_tạo: moment().format(ĐỊNH_DẠNG_NGÀY),
+      ngày_cập_nhật: moment().format(ĐỊNH_DẠNG_NGÀY),
       dữ_liệu,
       kích_thước: JSON.stringify(dữ_liệu).length,
     }
@@ -138,7 +176,7 @@ class DịchVụIndexedDB {
         const bộ_lưu_trữ = yêu_cầu.result
         if (bộ_lưu_trữ) {
           bộ_lưu_trữ.dữ_liệu = dữ_liệu
-          bộ_lưu_trữ.ngày_cập_nhật = Date.now()
+          bộ_lưu_trữ.ngày_cập_nhật = moment().format(ĐỊNH_DẠNG_NGÀY)
           bộ_lưu_trữ.kích_thước = JSON.stringify(dữ_liệu).length
 
           const cập_nhật = kho.put(bộ_lưu_trữ)
@@ -185,21 +223,16 @@ class DịchVụIndexedDB {
   }
 
   /**
-   * Tìm kiếm theo ngày cập nhật
+   * Tìm kiếm theo ngày cập nhật, `từ_ngày` và `đến_ngày` dạng DD/MM/YYYY (gồm cả hai đầu)
+   * Chuỗi DD/MM/YYYY không sắp xếp đúng theo thời gian nên không dùng được khoảng khóa của IndexedDB.
    */
-  async tìm_kiếm_theo_ngày(từ_ngày: number, đến_ngày: number): Promise<Bộ_Lưu_Trữ[]> {
-    if (!this.cơ_sở_dữ_liệu) throw new Error('IndexedDB chưa khởi tạo')
-
-    return new Promise((giải_quyết, từ_chối) => {
-      const giao_dịch = this.cơ_sở_dữ_liệu!.transaction([this.tên_kho_dữ_liệu], 'readonly')
-      const kho = giao_dịch.objectStore(this.tên_kho_dữ_liệu)
-      const chỉ_số = kho.index('ngày_cập_nhật')
-      const phạm_vi = IDBKeyRange.bound(từ_ngày, đến_ngày)
-      const yêu_cầu = chỉ_số.getAll(phạm_vi)
-
-      yêu_cầu.onerror = () => từ_chối(yêu_cầu.error)
-      yêu_cầu.onsuccess = () => giải_quyết(yêu_cầu.result)
-    })
+  async tìm_kiếm_theo_ngày(từ_ngày: string, đến_ngày: string): Promise<Bộ_Lưu_Trữ[]> {
+    const tất_cả = await this.lấy_tất_cả()
+    const từ = moment(từ_ngày, ĐỊNH_DẠNG_NGÀY)
+    const đến = moment(đến_ngày, ĐỊNH_DẠNG_NGÀY)
+    return tất_cả.filter((bộ_lưu_trữ) =>
+      moment(chuẩn_hóa_ngày(bộ_lưu_trữ.ngày_cập_nhật), ĐỊNH_DẠNG_NGÀY).isBetween(từ, đến, 'day', '[]'),
+    )
   }
 
   /**
@@ -246,7 +279,11 @@ class DịchVụIndexedDB {
         await new Promise<void>((giải_quyết, từ_chối) => {
           const giao_dịch = this.cơ_sở_dữ_liệu!.transaction([this.tên_kho_dữ_liệu], 'readwrite')
           const kho = giao_dịch.objectStore(this.tên_kho_dữ_liệu)
-          const yêu_cầu = kho.add(bộ_lưu_trữ)
+          const yêu_cầu = kho.add({
+            ...bộ_lưu_trữ,
+            ngày_tạo: chuẩn_hóa_ngày(bộ_lưu_trữ.ngày_tạo),
+            ngày_cập_nhật: chuẩn_hóa_ngày(bộ_lưu_trữ.ngày_cập_nhật),
+          })
 
           yêu_cầu.onsuccess = () => {
             đếm++
