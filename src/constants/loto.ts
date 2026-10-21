@@ -32,3 +32,7 @@ export const DANH_SÁCH_TỈNH: Tỉnh_Xổ_Số[] = [
   { tên: 'Bình Phước', thứ: 6 },
   { tên: 'Hậu Giang', thứ: 6 },
 ]
+
+// Google Sheet đã publish dạng CSV: mỗi dòng là tỉnh, ngày, 18 lô (dấu phẩy, không có tiêu đề)
+export const URL_GOOGLE_SHEET_LOTO =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKJmxPPwbuVU8u8sGZp-Q7Mt5LX5yprCZIaT8LGom1NyuWIm5j2NjOnr6KZbj-9nRQKAPcDFkTeR8a/pub?gid=809052019&single=true&output=csv'

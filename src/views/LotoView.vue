@@ -1,9 +1,21 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { lấy_dữ_liệu_loto } from '@/composables/loto'
+import { computed, onMounted, ref } from 'vue'
+import { lấy_dữ_liệu_loto, tải_dữ_liệu_loto_từ_sheet, type Tuần_Loto } from '@/composables/loto'
 import { DANH_SÁCH_TỈNH, SỐ_LÔ_MỖI_TỈNH, TÊN_THỨ } from '@/constants/loto'
 
-const các_tuần = lấy_dữ_liệu_loto()
+// hiện ngay dữ liệu có sẵn, sau đó thay bằng dữ liệu mới nhất từ Google Sheet nếu tải được
+const dữ_liệu_tuần = ref<Tuần_Loto[]>(lấy_dữ_liệu_loto())
+const các_tuần = computed(() => dữ_liệu_tuần.value)
+const trạng_thái_nguồn = ref<'đang tải' | 'google sheet' | 'dự phòng'>('đang tải')
+
+onMounted(async () => {
+  try {
+    dữ_liệu_tuần.value = await tải_dữ_liệu_loto_từ_sheet()
+    trạng_thái_nguồn.value = 'google sheet'
+  } catch {
+    trạng_thái_nguồn.value = 'dự phòng'
+  }
+})
 
 const số_lọc = ref<number>(83)
 const số_lọc_2_chữ_số = computed(() => {
@@ -63,7 +75,7 @@ const phân_tích_ngày = (ngày: string): number => {
 // tổng số lần xuất hiện của số đang lọc theo từng ngày có dữ liệu
 const tổng_theo_ngày = computed(() => {
   const kết_quả = new Map<number, number>()
-  for (const tuần of các_tuần) {
+  for (const tuần of các_tuần.value) {
     for (const tỉnh of tuần.các_tỉnh) {
       if (!tỉnh.ngày) continue
       const mốc = phân_tích_ngày(tỉnh.ngày)
@@ -159,7 +171,7 @@ const số_tuần_dài_hạn = ref<number>(4)
 
 // chỉ tính tuần đủ dữ liệu của tất cả tỉnh, tuần đang diễn ra dở sẽ bị lỗ ảo
 const các_tuần_đầy_đủ = computed(() =>
-  các_tuần
+  các_tuần.value
     .filter((tuần) => tuần.các_tỉnh.every((tỉnh) => tỉnh.ngày))
     .map((tuần) => {
       const số_lần = tuần.các_tỉnh.reduce((tổng, tỉnh) => tổng + đếm_số_lọc(tỉnh.hai_số_cuối), 0)
@@ -224,7 +236,7 @@ const số_lượng_top = ref<number>(10)
 // các số (00-99) đã xuất hiện theo từng ngày có dữ liệu
 const số_xuất_hiện_theo_ngày = computed(() => {
   const kết_quả = new Map<number, Set<string>>()
-  for (const tuần of các_tuần) {
+  for (const tuần of các_tuần.value) {
     for (const tỉnh of tuần.các_tỉnh) {
       if (!tỉnh.ngày) continue
       const mốc = phân_tích_ngày(tỉnh.ngày)
@@ -267,7 +279,7 @@ const top_lâu_chưa_ra = computed(() => {
 
 // theo ngày: mỗi tuần 1 dòng, 7 cột từ chủ nhật đến thứ 7
 const các_dòng_theo_ngày = computed(() =>
-  các_tuần.map((tuần) => ({
+  các_tuần.value.map((tuần) => ({
     nhãn: tuần.nhãn,
     các_ngày: TÊN_THỨ.map((_, thứ) => {
       const các_tỉnh_trong_ngày = tuần.các_tỉnh.filter((tỉnh) => tỉnh.thứ === thứ && tỉnh.ngày)
@@ -290,7 +302,7 @@ const màu_theo_tuần = (tổng: number): string =>
 
 // theo tuần: tổng số lần xuất hiện trong cả tuần
 const các_dòng_theo_tuần = computed(() =>
-  các_tuần.map((tuần) => {
+  các_tuần.value.map((tuần) => {
     let tổng = 0
     const chi_tiết: string[] = []
     for (const tỉnh of tuần.các_tỉnh) {
@@ -308,7 +320,7 @@ const các_dòng_theo_tuần = computed(() =>
 
 // mỗi tuần 1 dòng: số lô trúng của từng tỉnh, null nếu chưa có dữ liệu
 const các_dòng = computed(() =>
-  các_tuần.map((tuần) => ({
+  các_tuần.value.map((tuần) => ({
     nhãn: tuần.nhãn,
     số_lượng: tuần.các_tỉnh.map((tỉnh) =>
       tỉnh.hai_số_cuối.length ? đếm_số_lọc(tỉnh.hai_số_cuối) : null,
@@ -320,6 +332,12 @@ const các_dòng = computed(() =>
 <template>
   <div class="loto">
     <h2>Loto 22 tỉnh</h2>
+    <small>
+      Nguồn dữ liệu:
+      <template v-if="trạng_thái_nguồn === 'đang tải'">đang cập nhật từ Google Sheet...</template>
+      <template v-else-if="trạng_thái_nguồn === 'google sheet'">Google Sheet (mới nhất)</template>
+      <template v-else>dữ liệu có sẵn trong ứng dụng (không tải được Google Sheet)</template>
+    </small>
     <div class="bộ-lọc">
       <label>
         Số cần lọc (0–99):

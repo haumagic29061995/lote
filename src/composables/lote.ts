@@ -3,15 +3,49 @@ import moment from 'moment'
 import csv_dữ_liệu_55 from '@/assets/csv/lote55.csv?raw'
 import csv_dữ_liệu_45 from '@/assets/csv/lote45.csv?raw'
 
+import { LINK_CSV_LOTE_45, LINK_CSV_LOTE_55 } from '@/constants/lote'
+import { tải_csv_từ_link } from '@/composables/data-source'
 import { Đối_Tượng_Xổ_Số } from '@/types/lote'
 
 import { lấy_dấu_thời_gian_của_các_kỳ_tiếp_theo } from '@/utils'
 
+// nội dung CSV đang dùng: mặc định là file có sẵn trong dự án, được thay bằng dữ liệu Google Sheet nếu tải được
+let csv_45_hiện_tại: string = csv_dữ_liệu_45
+let csv_55_hiện_tại: string = csv_dữ_liệu_55
+
+/**
+ * Tải dữ liệu mới nhất từ Google Sheet, gọi một lần trước khi app khởi động.
+ * Lỗi (mất mạng, link sai, dữ liệu không hợp lệ) thì giữ file CSV có sẵn và báo ở console, không làm app dừng.
+ */
+export async function nạp_dữ_liệu_từ_google_sheet(): Promise<void> {
+  const nguồn = [
+    { tên: '45', link: LINK_CSV_LOTE_45, tổng_số: 45, đặt: (csv: string) => (csv_45_hiện_tại = csv) },
+    { tên: '55', link: LINK_CSV_LOTE_55, tổng_số: 55, đặt: (csv: string) => (csv_55_hiện_tại = csv) },
+  ]
+
+  await Promise.all(
+    nguồn.map(async ({ tên, link, tổng_số, đặt }) => {
+      try {
+        const dữ_liệu = await tải_csv_từ_link(link, tổng_số)
+        đặt(dữ_liệu.csv)
+        console.log(
+          `dữ liệu ${tên}: Google Sheet, ${dữ_liệu.số_kỳ} kỳ, mới nhất ${dữ_liệu.ngày_mới_nhất}`,
+        )
+        dữ_liệu.cảnh_báo.forEach((cảnh_báo) => console.warn(`dữ liệu ${tên}: ${cảnh_báo}`))
+      } catch (lỗi) {
+        console.warn(
+          `dữ liệu ${tên}: không tải được từ Google Sheet (${(lỗi as Error).message}), dùng file CSV có sẵn trong dự án (có thể cũ)`,
+        )
+      }
+    }),
+  )
+}
+
 export function lấy_dữ_liệu_xổ_số_45(): Array<Đối_Tượng_Xổ_Số> {
   const loại_xổ_số = 45
-  const nhiều_dòng = csv_dữ_liệu_45.split('\n').map((dòng) =>
+  const nhiều_dòng = csv_45_hiện_tại.split('\n').map((dòng) =>
     dòng
-      .split('\t')
+      .split(/\t|,/)
       .map((mục) => mục.trim())
       .filter((mục) => mục !== ''),
   )
@@ -59,9 +93,9 @@ export function lấy_dữ_liệu_xổ_số_45(): Array<Đối_Tượng_Xổ_S�
 
 export function lấy_dữ_liệu_xổ_số_55(): Array<Đối_Tượng_Xổ_Số> {
   const loại_xổ_số = 55
-  const nhiều_dòng = csv_dữ_liệu_55.split('\n').map((dòng) =>
+  const nhiều_dòng = csv_55_hiện_tại.split('\n').map((dòng) =>
     dòng
-      .split(/\t| \|/)
+      .split(/\t|,| \|/)
       .map((mục) => mục.trim())
       .filter((mục) => mục !== ''),
   )
