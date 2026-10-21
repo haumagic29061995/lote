@@ -10,6 +10,44 @@ export type Dự_Đoán_Đã_Lưu = {
   vị_trí_ds_xuất_hiện: number[][][]
 }
 
+// Bộ vé phủ đã tạo, lưu để sau này đối chiếu với kết quả thật khi có
+export const TIỀN_TỐ_BỘ_VÉ_PHỦ = 'bộ_vé_phủ|'
+
+export type Bộ_Vé_Phủ_Đã_Lưu = {
+  loại_xổ_số: number
+  ngày_cơ_sở: string // ngày kỳ mới nhất trong dữ liệu lúc tạo (DD/MM/YYYY), cũng là seed
+  ngày_dự_đoán: string // ngày kỳ tiếp theo mà bộ vé dành cho (DD/MM/YYYY)
+  thời_điểm_tạo: number
+  nhóm_số: number[]
+  mức_đảm_bảo: number
+  số_vé_tối_thiểu: number
+  vé: number[][]
+}
+
+// Vé tạo từ danh sách xuất hiện của kỳ mới nhất (công thức cố định), lưu để đối chiếu sau
+export const TIỀN_TỐ_VÉ_TỪ_DANH_SÁCH = 'vé_từ_danh_sách|'
+
+export type Vé_Từ_Danh_Sách_Đã_Lưu = {
+  loại_xổ_số: number
+  ngày_cơ_sở: string // ngày kỳ mới nhất trong dữ liệu lúc tạo (DD/MM/YYYY)
+  ngày_dự_đoán: string // ngày kỳ tiếp theo mà bộ vé dành cho (DD/MM/YYYY)
+  thời_điểm_tạo: number
+  chỉ_số_danh_sách: number
+  vé: string[][]
+}
+
+// Vé mục tiêu (vé kỳ tới theo chiến lược), lưu để đối chiếu sau
+export const TIỀN_TỐ_VÉ_MỤC_TIÊU = 'vé_mục_tiêu|'
+
+export type Vé_Mục_Tiêu_Đã_Lưu = {
+  loại_xổ_số: number
+  ngày_cơ_sở: string // ngày kỳ mới nhất trong dữ liệu lúc tạo (DD/MM/YYYY), cũng là seed
+  ngày_dự_đoán: string // ngày kỳ tiếp theo mà bộ vé dành cho (DD/MM/YYYY)
+  thời_điểm_tạo: number
+  chiến_lược: string
+  vé: string[][]
+}
+
 function mở_cơ_sở_dữ_liệu(): Promise<IDBDatabase> {
   return new Promise((giải_quyết, từ_chối) => {
     const yêu_cầu = indexedDB.open(TÊN_CƠ_SỞ_DỮ_LIỆU, 1)
@@ -39,6 +77,35 @@ export async function đọc_bộ_nhớ_đệm<T>(khóa: string): Promise<T | un
   } catch (lỗi) {
     console.warn('Không đọc được bộ nhớ đệm:', lỗi)
     return undefined
+  }
+}
+
+// Lấy mọi bản ghi có khóa bắt đầu bằng `tiền_tố`
+export async function liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<T>(
+  tiền_tố: string,
+): Promise<Array<{ khóa: string; giá_trị: T }>> {
+  try {
+    const cơ_sở = await mở_cơ_sở_dữ_liệu()
+    try {
+      return await new Promise<Array<{ khóa: string; giá_trị: T }>>((giải_quyết, từ_chối) => {
+        const kho = cơ_sở.transaction(TÊN_KHO_DỮ_LIỆU, 'readonly').objectStore(TÊN_KHO_DỮ_LIỆU)
+        const phạm_vi = IDBKeyRange.bound(tiền_tố, tiền_tố + '\uffff')
+        const kết_quả: Array<{ khóa: string; giá_trị: T }> = []
+        const yêu_cầu = kho.openCursor(phạm_vi)
+        yêu_cầu.onerror = () => từ_chối(yêu_cầu.error)
+        yêu_cầu.onsuccess = () => {
+          const con_trỏ = yêu_cầu.result
+          if (!con_trỏ) return giải_quyết(kết_quả)
+          kết_quả.push({ khóa: String(con_trỏ.key), giá_trị: con_trỏ.value })
+          con_trỏ.continue()
+        }
+      })
+    } finally {
+      cơ_sở.close()
+    }
+  } catch (lỗi) {
+    console.warn('Không đọc được bộ nhớ đệm:', lỗi)
+    return []
   }
 }
 

@@ -48,7 +48,7 @@ const chọn_số = (số: string) => {
   số_lọc.value = Number(số)
 }
 
-const chế_độ_xem = ref<'ngày' | 'tỉnh' | 'tuần' | 'dài hạn'>('ngày')
+const chế_độ_xem = ref<'ngày' | 'tỉnh' | 'tuần' | 'dài hạn' | 'lâu chưa ra'>('ngày')
 
 const đếm_số_lọc = (hai_số_cuối: string[]): number =>
   hai_số_cuối.filter((số) => số === số_lọc_2_chữ_số.value).length
@@ -219,6 +219,52 @@ const định_dạng_tiền = (số: number): string =>
 const phần_trăm = (tử: number, mẫu: number): string =>
   mẫu > 0 ? `${((tử / mẫu) * 100).toFixed(1)}%` : '—'
 
+const số_lượng_top = ref<number>(10)
+
+// các số (00-99) đã xuất hiện theo từng ngày có dữ liệu
+const số_xuất_hiện_theo_ngày = computed(() => {
+  const kết_quả = new Map<number, Set<string>>()
+  for (const tuần of các_tuần) {
+    for (const tỉnh of tuần.các_tỉnh) {
+      if (!tỉnh.ngày) continue
+      const mốc = phân_tích_ngày(tỉnh.ngày)
+      const tập = kết_quả.get(mốc) ?? new Set<string>()
+      tỉnh.hai_số_cuối.forEach((số) => tập.add(số))
+      kết_quả.set(mốc, tập)
+    }
+  }
+  return kết_quả
+})
+
+// top số vắng lâu nhất tính đến ngày mới nhất; đồng hạng ở cuối top đều được thêm vào
+const top_lâu_chưa_ra = computed(() => {
+  const các_mốc = [...số_xuất_hiện_theo_ngày.value.keys()].sort((a, b) => b - a)
+  if (!các_mốc.length) return []
+  const danh_sách = Array.from({ length: 100 }, (_, i) => String(i).padStart(2, '0')).map((số) => {
+    let số_ngày = 0
+    let lần_ra_gần_nhất = 0
+    for (let i = 0; i < các_mốc.length; i++) {
+      if (i > 0 && các_mốc[i - 1] - các_mốc[i] !== MỘT_NGÀY) break
+      if (số_xuất_hiện_theo_ngày.value.get(các_mốc[i])?.has(số)) {
+        lần_ra_gần_nhất = các_mốc[i]
+        break
+      }
+      số_ngày++
+    }
+    return { số, số_ngày, lần_ra_gần_nhất }
+  })
+  danh_sách.sort((a, b) => b.số_ngày - a.số_ngày || a.số.localeCompare(b.số))
+  const n = Math.min(100, Math.max(1, Math.trunc(Number(số_lượng_top.value) || 1)))
+  const mức_cắt = danh_sách[n - 1].số_ngày
+  let hạng = 0
+  return danh_sách
+    .filter((mục) => mục.số_ngày >= mức_cắt)
+    .map((mục, i, mảng) => {
+      if (i === 0 || mục.số_ngày !== mảng[i - 1].số_ngày) hạng = i + 1
+      return { ...mục, hạng }
+    })
+})
+
 // theo ngày: mỗi tuần 1 dòng, 7 cột từ chủ nhật đến thứ 7
 const các_dòng_theo_ngày = computed(() =>
   các_tuần.map((tuần) => ({
@@ -339,6 +385,7 @@ const các_dòng = computed(() =>
         <option value="tỉnh">Theo tỉnh</option>
         <option value="tuần">Theo tuần</option>
         <option value="dài hạn">Dài hạn</option>
+        <option value="lâu chưa ra">Số lâu chưa ra</option>
       </select>
     </label>
     <div v-if="chế_độ_xem === 'ngày'" class="loto-scroll">
@@ -429,6 +476,49 @@ const các_dòng = computed(() =>
           </tbody>
         </table>
       </div>
+    </div>
+    <div v-else-if="chế_độ_xem === 'lâu chưa ra'">
+      <label>
+        Top:
+        <input v-model.number="số_lượng_top" type="number" min="1" max="100" />
+      </label>
+      <p>
+        Tổng cộng <b>{{ top_lâu_chưa_ra.length }} số</b>. Số ngày liên tiếp chưa ra tính đến ngày
+        mới nhất; số đồng hạng ở cuối top đều được hiển thị. Bấm vào một số để xem thống kê của số
+        đó.
+      </p>
+      <div class="loto-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Hạng</th>
+              <th>Số</th>
+              <th>Số ngày chưa ra</th>
+              <th>Lần ra gần nhất</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(mục, vị_trí) in top_lâu_chưa_ra"
+              :key="mục.số"
+              class="dòng-chọn"
+              @click="chọn_số(mục.số)"
+            >
+              <td>{{ vị_trí + 1 }}</td>
+              <th>{{ mục.hạng }}</th>
+              <td>{{ mục.số }}</td>
+              <td>{{ mục.số_ngày }}</td>
+              <td>
+                {{
+                  mục.lần_ra_gần_nhất ? định_dạng_mốc(mục.lần_ra_gần_nhất) : 'chưa có trong dữ liệu'
+                }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <small>Các kỳ xổ số độc lập nhau, số vắng lâu không có nghĩa là sắp ra.</small>
     </div>
     <div v-else class="loto-scroll">
       <table>
@@ -525,5 +615,8 @@ td.màu-đỏ {
 }
 .lỗ {
   color: #ff6b6b;
+}
+.dòng-chọn {
+  cursor: pointer;
 }
 </style>
