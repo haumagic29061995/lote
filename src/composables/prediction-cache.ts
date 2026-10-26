@@ -4,6 +4,9 @@ import type { Đối_Tượng_Xổ_Số } from '@/types/lote'
 const TÊN_CƠ_SỞ_DỮ_LIỆU = 'BộNhớĐệmDựĐoán'
 const TÊN_KHO_DỮ_LIỆU = 'bộ_nhớ_đệm'
 
+// Khóa của danh sách dự đoán là `${TIỀN_TỐ_DS_DỰ_ĐOÁN}${loại_xổ_số}`
+export const TIỀN_TỐ_DS_DỰ_ĐOÁN = 'ds_dự_đoán_'
+
 export type Dự_Đoán_Đã_Lưu = {
   dấu_vân_tay: string
   dự_đoán_ds_xuất_hiện: string[][][]
@@ -125,6 +128,28 @@ export async function ghi_bộ_nhớ_đệm<T>(khóa: string, giá_trị: T): Pr
     }
   } catch (lỗi) {
     console.warn('Không ghi được bộ nhớ đệm:', lỗi)
+  }
+}
+
+// Xoá toàn bộ bản ghi trong kho (cả danh sách dự đoán lẫn các bộ vé đã lưu), trả về false nếu lỗi
+export async function xóa_toàn_bộ_bộ_nhớ_đệm(): Promise<boolean> {
+  try {
+    const cơ_sở = await mở_cơ_sở_dữ_liệu()
+    try {
+      await new Promise<void>((giải_quyết, từ_chối) => {
+        const giao_dịch = cơ_sở.transaction(TÊN_KHO_DỮ_LIỆU, 'readwrite')
+        giao_dịch.objectStore(TÊN_KHO_DỮ_LIỆU).clear()
+        giao_dịch.oncomplete = () => giải_quyết()
+        giao_dịch.onerror = () => từ_chối(giao_dịch.error)
+        giao_dịch.onabort = () => từ_chối(giao_dịch.error)
+      })
+      return true
+    } finally {
+      cơ_sở.close()
+    }
+  } catch (lỗi) {
+    console.warn('Không xoá được bộ nhớ đệm:', lỗi)
+    return false
   }
 }
 

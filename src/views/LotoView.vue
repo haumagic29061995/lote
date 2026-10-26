@@ -60,7 +60,9 @@ const chọn_số = (số: string) => {
   số_lọc.value = Number(số)
 }
 
-const chế_độ_xem = ref<'ngày' | 'tỉnh' | 'tuần' | 'dài hạn' | 'lâu chưa ra'>('ngày')
+const chế_độ_xem = ref<'ngày' | 'tỉnh' | 'tuần' | 'dài hạn' | 'lâu chưa ra' | 'giải đặc biệt'>(
+  'ngày',
+)
 
 const đếm_số_lọc = (hai_số_cuối: string[]): number =>
   hai_số_cuối.filter((số) => số === số_lọc_2_chữ_số.value).length
@@ -233,6 +235,58 @@ const phần_trăm = (tử: number, mẫu: number): string =>
 
 const số_lượng_top = ref<number>(10)
 
+const định_dạng_ngày_nhập = (ngày: Date): string =>
+  [ngày.getFullYear(), ngày.getMonth() + 1, ngày.getDate()]
+    .map((số, i) => String(số).padStart(i === 0 ? 4 : 2, '0'))
+    .join('-')
+
+// mặc định: từ hôm nay đến 7 ngày trước đó (thứ tự hai ngày nhập vào không quan trọng)
+const hôm_nay = new Date()
+const từ_ngày_đặc_biệt = ref<string>(định_dạng_ngày_nhập(hôm_nay))
+const đến_ngày_đặc_biệt = ref<string>(
+  định_dạng_ngày_nhập(new Date(hôm_nay.getFullYear(), hôm_nay.getMonth(), hôm_nay.getDate() - 7)),
+)
+
+const mốc_từ_ô_nhập = (giá_trị: string): number | null => {
+  const [năm, tháng, ngày] = giá_trị.split('-').map(Number)
+  return năm && tháng && ngày ? Date.UTC(năm, tháng - 1, ngày) : null
+}
+
+// thống kê 2 số giải 8 và 2 số cuối giải đặc biệt trong khoảng ngày đã chọn (gồm cả hai đầu)
+const thống_kê_đặc_biệt = computed(() => {
+  const mốc_a = mốc_từ_ô_nhập(từ_ngày_đặc_biệt.value)
+  const mốc_b = mốc_từ_ô_nhập(đến_ngày_đặc_biệt.value)
+  const hợp_lệ = mốc_a !== null && mốc_b !== null
+  const nhỏ = hợp_lệ ? Math.min(mốc_a, mốc_b) : 0
+  const lớn = hợp_lệ ? Math.max(mốc_a, mốc_b) : -1
+  const các_kỳ = các_tuần.value
+    .flatMap((tuần) => tuần.các_tỉnh)
+    .filter((tỉnh) => {
+      if (!tỉnh.đặc_biệt) return false
+      const mốc = phân_tích_ngày(tỉnh.ngày)
+      return mốc >= nhỏ && mốc <= lớn
+    })
+  const tạo_bảng = (lấy_số: (kỳ: (typeof các_kỳ)[number]) => string) => {
+    const đếm = new Map<string, number>()
+    for (const kỳ of các_kỳ) {
+      const số = lấy_số(kỳ)
+      đếm.set(số, (đếm.get(số) ?? 0) + 1)
+    }
+    return [...đếm.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([số, lần]) => ({ số, lần }))
+  }
+  return {
+    hợp_lệ,
+    từ: nhỏ,
+    đến: lớn,
+    số_ngày_có_dữ_liệu: new Set(các_kỳ.map((kỳ) => kỳ.ngày)).size,
+    tổng_kỳ: các_kỳ.length,
+    giải_tám: tạo_bảng((kỳ) => kỳ.giải_tám),
+    cuối: tạo_bảng((kỳ) => kỳ.đặc_biệt.slice(-2)),
+  }
+})
+
 // các số (00-99) đã xuất hiện theo từng ngày có dữ liệu
 const số_xuất_hiện_theo_ngày = computed(() => {
   const kết_quả = new Map<number, Set<string>>()
@@ -404,6 +458,7 @@ const các_dòng = computed(() =>
         <option value="tuần">Theo tuần</option>
         <option value="dài hạn">Dài hạn</option>
         <option value="lâu chưa ra">Số lâu chưa ra</option>
+        <option value="giải đặc biệt">Giải đặc biệt</option>
       </select>
     </label>
     <div v-if="chế_độ_xem === 'ngày'" class="loto-scroll">
@@ -538,6 +593,57 @@ const các_dòng = computed(() =>
       </div>
       <small>Các kỳ xổ số độc lập nhau, số vắng lâu không có nghĩa là sắp ra.</small>
     </div>
+    <div v-else-if="chế_độ_xem === 'giải đặc biệt'">
+      <label>
+        Từ ngày:
+        <input v-model="từ_ngày_đặc_biệt" type="date" />
+      </label>
+      <label>
+        Đến ngày:
+        <input v-model="đến_ngày_đặc_biệt" type="date" />
+      </label>
+      <p v-if="!thống_kê_đặc_biệt.hợp_lệ">Hãy chọn đủ hai ngày.</p>
+      <p v-else>
+        Từ {{ định_dạng_mốc(thống_kê_đặc_biệt.từ) }} đến {{ định_dạng_mốc(thống_kê_đặc_biệt.đến) }}:
+        có <b>{{ thống_kê_đặc_biệt.số_ngày_có_dữ_liệu }}</b> ngày có dữ liệu,
+        <b>{{ thống_kê_đặc_biệt.tổng_kỳ }}</b> kỳ (mỗi tỉnh mỗi ngày một kỳ). Xác suất lý thuyết mỗi
+        số ở mỗi kỳ là 1%. Xác suất bên dưới là tỉ lệ thực tế = số lần ra /
+        {{ thống_kê_đặc_biệt.tổng_kỳ }} kỳ.
+      </p>
+      <div class="hai-bảng">
+        <div
+          v-for="bảng in [
+            { tên: '2 số giải 8', dữ_liệu: thống_kê_đặc_biệt.giải_tám },
+            { tên: '2 số cuối giải đặc biệt', dữ_liệu: thống_kê_đặc_biệt.cuối },
+          ]"
+          :key="bảng.tên"
+        >
+          <h3>{{ bảng.tên }}</h3>
+          <p>Đã ra {{ bảng.dữ_liệu.length }}/100 số.</p>
+          <table>
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Số</th>
+                <th>Số lần</th>
+                <th>Xác suất</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(mục, vị_trí) in bảng.dữ_liệu" :key="mục.số">
+                <td>{{ vị_trí + 1 }}</td>
+                <td>{{ mục.số }}</td>
+                <td>{{ mục.lần }}</td>
+                <td>{{ phần_trăm(mục.lần, thống_kê_đặc_biệt.tổng_kỳ) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <small
+        >Các kỳ xổ số độc lập nhau, số ra nhiều trước đó không làm tăng khả năng ra tiếp.</small
+      >
+    </div>
     <div v-else class="loto-scroll">
       <table>
         <thead>
@@ -636,5 +742,10 @@ td.màu-đỏ {
 }
 .dòng-chọn {
   cursor: pointer;
+}
+.hai-bảng {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
 }
 </style>

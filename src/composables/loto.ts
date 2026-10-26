@@ -6,6 +6,8 @@ export type Kết_Quả_Loto_Tỉnh = {
   tên: string
   thứ: number
   ngày: string
+  đặc_biệt: string // giải đặc biệt đầy đủ 6 chữ số, rỗng nếu chưa có dữ liệu
+  giải_tám: string // giải 8 (2 chữ số), rỗng nếu chưa có dữ liệu
   hai_số_cuối: string[] // 2 chữ số cuối của từng lô, dùng để lọc; rỗng nếu chưa có dữ liệu
 }
 
@@ -57,6 +59,8 @@ export function phân_tích_dữ_liệu_loto(nội_dung: string): {
           tên,
           thứ,
           ngày: kết_quả?.ngày ?? '',
+          đặc_biệt: kết_quả?.các_lô[0] ?? '',
+          giải_tám: kết_quả?.các_lô[SỐ_LÔ_MỖI_TỈNH - 1] ?? '',
           hai_số_cuối: kết_quả ? kết_quả.các_lô.map((lô) => lô.slice(-2)) : [],
         }
       }),

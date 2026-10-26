@@ -21,6 +21,8 @@ import {
 import {
   đọc_bộ_nhớ_đệm,
   ghi_bộ_nhớ_đệm,
+  xóa_toàn_bộ_bộ_nhớ_đệm,
+  TIỀN_TỐ_DS_DỰ_ĐOÁN,
   liệt_kê_bộ_nhớ_đệm_theo_tiền_tố,
   tạo_dấu_vân_tay,
   TIỀN_TỐ_BỘ_VÉ_PHỦ,
@@ -49,6 +51,13 @@ const SỐ_XUẤT_HIỆN_45 = 40
 const SỐ_XUẤT_HIỆN_55 = 46
 // tăng số này khi đổi thuật toán tạo danh sách dự đoán để bỏ cache cũ trong IndexedDB
 const PHIÊN_BẢN_BỘ_NHỚ_ĐỆM = 1
+
+// Xoá cả danh sách dự đoán lẫn các bộ vé đã lưu để đối chiếu
+async function xóa_hết_bộ_nhớ_đệm() {
+  if (!window.confirm('Xoá hết bộ nhớ đệm (gồm cả các bộ vé đã lưu để đối chiếu)?')) return
+  const thành_công = await xóa_toàn_bộ_bộ_nhớ_đệm()
+  window.alert(thành_công ? 'Đã xoá hết bộ nhớ đệm' : 'Không xoá được bộ nhớ đệm')
+}
 
 function lấy_tên_lưu_trữ(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>): string {
   return danh_sách_dữ_liệu[0].loại_xổ_số === 45 ? LOTE_45_HẰNG_SỐ : LOTE_55_HẰNG_SỐ
@@ -173,7 +182,7 @@ async function chuẩn_bị_ds_dự_đoán() {
     [dữ_liệu_xổ_số_55, dữ_liệu_xổ_số_45],
   ]) {
     const loại_xổ_số = danh_sách_dữ_liệu[0].loại_xổ_số
-    const khóa = `ds_dự_đoán_${loại_xổ_số}`
+    const khóa = `${TIỀN_TỐ_DS_DỰ_ĐOÁN}${loại_xổ_số}`
     const dấu_vân_tay = tạo_dấu_vân_tay(danh_sách_dữ_liệu, danh_sách_dữ_liệu_khác, tham_số)
 
     const đã_lưu = await đọc_bộ_nhớ_đệm<Dự_Đoán_Đã_Lưu>(khóa)
@@ -1191,6 +1200,9 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
 
       <div>
         <div>
+          <div>
+            <button @click="xóa_hết_bộ_nhớ_đệm">Xoá hết bộ nhớ đệm</button>
+          </div>
           <div>
             *1*
             <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán 55</button>
