@@ -498,7 +498,25 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
 
   // tra cứu theo (mức trùng, tập vị trí đã sắp xếp) thay vì find + sort trên toàn bộ tập_vị_trí
   const chỉ_mục_vị_trí = new Map<string, Vị_Trí_Lặp_Lại>()
-  const ghi_nhận_vị_trí_lặp_lại = (trùng: number, ds_vị_trí: number[], k: number, i: number) => {
+  // "vị trí j" ghi theo đúng cách xem_dự_đoán_cho_tất_cả đánh số: các bộ vị trí của kỳ k+1, k+2, ... nối nhau
+  // (kỳ gần k nhất trước). Vòng lặp dưới đi từ kỳ cũ đến mới nên cần đổi từ chỉ số trong danh sách đang tích lũy.
+  const tổng_bộ_trước_kỳ: number[] = [0]
+  danh_sách_dữ_liệu.forEach((dữ_liệu) =>
+    tổng_bộ_trước_kỳ.push(tổng_bộ_trước_kỳ[tổng_bộ_trước_kỳ.length - 1] + dữ_liệu.vị_trí_ds_xuất_hiện.length),
+  )
+  const nguồn_bộ_vị_trí: Array<{ kỳ: number; thứ_tự: number }> = []
+
+  const ghi_nhận_vị_trí_lặp_lại = (
+    trùng: number,
+    ds_vị_trí: number[],
+    k: number,
+    i: number,
+    j: number,
+  ) => {
+    // đổi j (chỉ số trong danh sách tích lũy cũ đến mới) sang chỉ số mà xem dự đoán in ra cho kỳ k
+    const { kỳ: kỳ_gốc, thứ_tự } = nguồn_bộ_vị_trí[j]
+    const vị_trí_j = tổng_bộ_trước_kỳ[kỳ_gốc] - tổng_bộ_trước_kỳ[k + 1] + thứ_tự
+
     const ds_đã_sắp_xếp = [...ds_vị_trí].sort((a, b) => a - b)
     const khóa = `${trùng}|${ds_đã_sắp_xếp.join(',')}`
     const vị_trí_tồn_tại = chỉ_mục_vị_trí.get(khóa)
@@ -506,6 +524,7 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
       vị_trí_tồn_tại.tổng_xuất_hiện += 1
       vị_trí_tồn_tại.xuất_hiện.push(k)
       vị_trí_tồn_tại.danh_sách.push(i)
+      vị_trí_tồn_tại.vị_trí?.push(vị_trí_j)
     } else {
       const vị_trí_mới: Vị_Trí_Lặp_Lại = {
         ds_vị_trí: ds_đã_sắp_xếp,
@@ -513,6 +532,7 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
         trùng,
         xuất_hiện: [k],
         danh_sách: [i],
+        vị_trí: [vị_trí_j],
       }
       tập_vị_trí.push(vị_trí_mới)
       chỉ_mục_vị_trí.set(khóa, vị_trí_mới)
@@ -546,15 +566,17 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
             ds_vị_trí,
             k,
             i,
+            j,
           )
         }
         if (tổng === 6) {
-          ghi_nhận_vị_trí_lặp_lại(6, ds_vị_trí, k, i)
+          ghi_nhận_vị_trí_lặp_lại(6, ds_vị_trí, k, i, j)
         }
       }
     }
 
     tất_cả_ds_vị_trí_dự_đoán.push(...dữ_liệu.vị_trí_ds_xuất_hiện)
+    dữ_liệu.vị_trí_ds_xuất_hiện.forEach((_, thứ_tự) => nguồn_bộ_vị_trí.push({ kỳ: k, thứ_tự }))
   }
   const tên_lưu_trữ = lấy_tên_lưu_trữ(danh_sách_dữ_liệu)
   await dịch_vụ_indexeddb.khởi_tạo()
@@ -575,6 +597,7 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
     trùng: item.trùng,
     xuất_hiện: item.xuất_hiện.join(', '),
     danh_sách: item.danh_sách.join(', '),
+    vị_trí: (item.vị_trí ?? []).join(', '),
   }))
   console.log('kết quả thống kê dự đoán: ', kết_quả)
 }
@@ -595,6 +618,7 @@ async function phân_tích_và_dự_đoán(danh_sách_dữ_liệu: Array<Đối_
       vị_trí_tồn_tại.tổng_xuất_hiện += item.tổng_xuất_hiện
       vị_trí_tồn_tại.xuất_hiện.push(...item.xuất_hiện)
       vị_trí_tồn_tại.danh_sách.push(...item.danh_sách)
+      vị_trí_tồn_tại.vị_trí?.push(...(item.vị_trí ?? []))
     } else {
       dữ_liệu_nhóm.push({
         ds_vị_trí: item.ds_vị_trí,
@@ -602,6 +626,7 @@ async function phân_tích_và_dự_đoán(danh_sách_dữ_liệu: Array<Đối_
         trùng: item.trùng,
         xuất_hiện: [...item.xuất_hiện],
         danh_sách: [...item.danh_sách],
+        vị_trí: [...(item.vị_trí ?? [])],
       })
     }
   })
@@ -616,6 +641,7 @@ async function phân_tích_và_dự_đoán(danh_sách_dữ_liệu: Array<Đối_
     trùng: item.trùng,
     xuất_hiện: item.xuất_hiện.join(', '),
     danh_sách: item.danh_sách.join(', '),
+    vị_trí: (item.vị_trí ?? []).join(', '),
   }))
   console.group('Phân tích và dự đoán')
   console.log('tổng danh sách: ', dữ_liệu.length)

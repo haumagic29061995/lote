@@ -287,49 +287,59 @@ const thống_kê_đặc_biệt = computed(() => {
   }
 })
 
-// các số (00-99) đã xuất hiện theo từng ngày có dữ liệu
-const số_xuất_hiện_theo_ngày = computed(() => {
+// các số (00-99) đã xuất hiện theo từng ngày có dữ liệu, theo nguồn lấy số từ mỗi tỉnh
+const gom_số_theo_ngày = (lấy_số: (tỉnh: Tuần_Loto['các_tỉnh'][number]) => string[]) => {
   const kết_quả = new Map<number, Set<string>>()
   for (const tuần of các_tuần.value) {
     for (const tỉnh of tuần.các_tỉnh) {
       if (!tỉnh.ngày) continue
       const mốc = phân_tích_ngày(tỉnh.ngày)
       const tập = kết_quả.get(mốc) ?? new Set<string>()
-      tỉnh.hai_số_cuối.forEach((số) => tập.add(số))
+      lấy_số(tỉnh).forEach((số) => số && tập.add(số))
       kết_quả.set(mốc, tập)
     }
   }
   return kết_quả
-})
+}
 
-// top số vắng lâu nhất tính đến ngày mới nhất; đồng hạng ở cuối top đều được thêm vào
-const top_lâu_chưa_ra = computed(() => {
-  const các_mốc = [...số_xuất_hiện_theo_ngày.value.keys()].sort((a, b) => b - a)
-  if (!các_mốc.length) return []
-  const danh_sách = Array.from({ length: 100 }, (_, i) => String(i).padStart(2, '0')).map((số) => {
-    let số_ngày = 0
-    let lần_ra_gần_nhất = 0
-    for (let i = 0; i < các_mốc.length; i++) {
-      if (i > 0 && các_mốc[i - 1] - các_mốc[i] !== MỘT_NGÀY) break
-      if (số_xuất_hiện_theo_ngày.value.get(các_mốc[i])?.has(số)) {
-        lần_ra_gần_nhất = các_mốc[i]
-        break
-      }
-      số_ngày++
+const lô_theo_ngày = computed(() => gom_số_theo_ngày((tỉnh) => tỉnh.hai_số_cuối))
+const đầu_theo_ngày = computed(() => gom_số_theo_ngày((tỉnh) => [tỉnh.giải_tám]))
+const đặc_biệt_theo_ngày = computed(() => gom_số_theo_ngày((tỉnh) => [tỉnh.đặc_biệt.slice(-2)]))
+
+// số ngày liên tiếp chưa ra tính đến ngày mới nhất và ngày ra gần nhất; ngày thiếu dữ liệu làm đứt chuỗi
+const chuỗi_chưa_ra = (theo_ngày: Map<number, Set<string>>, số: string) => {
+  const các_mốc = [...theo_ngày.keys()].sort((a, b) => b - a)
+  let số_ngày = 0
+  let lần_ra_gần_nhất = 0
+  for (let i = 0; i < các_mốc.length; i++) {
+    if (i > 0 && các_mốc[i - 1] - các_mốc[i] !== MỘT_NGÀY) break
+    if (theo_ngày.get(các_mốc[i])?.has(số)) {
+      lần_ra_gần_nhất = các_mốc[i]
+      break
     }
-    return { số, số_ngày, lần_ra_gần_nhất }
-  })
+    số_ngày++
+  }
+  return { số_ngày, lần_ra_gần_nhất }
+}
+
+// top số vắng lâu nhất của từng nhóm, mỗi nhóm xếp riêng; đồng hạng ở cuối top đều được thêm vào
+const tạo_top_lâu_chưa_ra = (theo_ngày: Map<number, Set<string>>) => {
+  if (!theo_ngày.size) return []
+  const danh_sách = Array.from({ length: 100 }, (_, i) => String(i).padStart(2, '0')).map((số) => ({
+    số,
+    ...chuỗi_chưa_ra(theo_ngày, số),
+  }))
   danh_sách.sort((a, b) => b.số_ngày - a.số_ngày || a.số.localeCompare(b.số))
   const n = Math.min(100, Math.max(1, Math.trunc(Number(số_lượng_top.value) || 1)))
   const mức_cắt = danh_sách[n - 1].số_ngày
-  let hạng = 0
-  return danh_sách
-    .filter((mục) => mục.số_ngày >= mức_cắt)
-    .map((mục, i, mảng) => {
-      if (i === 0 || mục.số_ngày !== mảng[i - 1].số_ngày) hạng = i + 1
-      return { ...mục, hạng }
-    })
-})
+  return danh_sách.filter((mục) => mục.số_ngày >= mức_cắt)
+}
+
+const top_lâu_chưa_ra = computed(() => [
+  { tên: '18 lô (2 số cuối các giải)', danh_sách: tạo_top_lâu_chưa_ra(lô_theo_ngày.value) },
+  { tên: 'Đầu giải 8 (2 số)', danh_sách: tạo_top_lâu_chưa_ra(đầu_theo_ngày.value) },
+  { tên: 'Đặc biệt (2 số cuối)', danh_sách: tạo_top_lâu_chưa_ra(đặc_biệt_theo_ngày.value) },
+])
 
 // theo ngày: mỗi tuần 1 dòng, 7 cột từ chủ nhật đến thứ 7
 const các_dòng_theo_ngày = computed(() =>
@@ -556,40 +566,37 @@ const các_dòng = computed(() =>
         <input v-model.number="số_lượng_top" type="number" min="1" max="100" />
       </label>
       <p>
-        Tổng cộng <b>{{ top_lâu_chưa_ra.length }} số</b>. Số ngày liên tiếp chưa ra tính đến ngày
-        mới nhất; số đồng hạng ở cuối top đều được hiển thị. Bấm vào một số để xem thống kê của số
-        đó.
+        Mỗi nhóm xếp riêng theo số ngày liên tiếp chưa ra tính đến ngày mới nhất; số đồng hạng ở
+        cuối top đều được hiển thị. Bấm vào một số để xem thống kê của số đó.
       </p>
-      <div class="loto-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>STT</th>
-              <th>Hạng</th>
-              <th>Số</th>
-              <th>Số ngày chưa ra</th>
-              <th>Lần ra gần nhất</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(mục, vị_trí) in top_lâu_chưa_ra"
-              :key="mục.số"
-              class="dòng-chọn"
-              @click="chọn_số(mục.số)"
-            >
-              <td>{{ vị_trí + 1 }}</td>
-              <th>{{ mục.hạng }}</th>
-              <td>{{ mục.số }}</td>
-              <td>{{ mục.số_ngày }}</td>
-              <td>
-                {{
-                  mục.lần_ra_gần_nhất ? định_dạng_mốc(mục.lần_ra_gần_nhất) : 'chưa có trong dữ liệu'
-                }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="hai-bảng">
+        <div v-for="nhóm in top_lâu_chưa_ra" :key="nhóm.tên">
+          <h3>{{ nhóm.tên }}</h3>
+          <p>Tổng cộng {{ nhóm.danh_sách.length }} số.</p>
+          <table>
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Số</th>
+                <th>Số ngày chưa ra</th>
+                <th>Ngày ra</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(mục, vị_trí) in nhóm.danh_sách"
+                :key="mục.số"
+                class="dòng-chọn"
+                @click="chọn_số(mục.số)"
+              >
+                <td>{{ vị_trí + 1 }}</td>
+                <td>{{ mục.số }}</td>
+                <td>{{ mục.số_ngày }}</td>
+                <td>{{ mục.lần_ra_gần_nhất ? định_dạng_mốc(mục.lần_ra_gần_nhất) : '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
       <small>Các kỳ xổ số độc lập nhau, số vắng lâu không có nghĩa là sắp ra.</small>
     </div>

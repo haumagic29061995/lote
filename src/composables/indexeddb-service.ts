@@ -13,6 +13,9 @@ export type Vị_Trí_Lặp_Lại = {
   trùng: number
   danh_sách: number[]
   xuất_hiện: number[]
+  // chỉ số của bộ vị trí trong danh sách bộ vị trí mà "xem dự đoán" dùng cho kỳ tương ứng (tức "vị trí j"
+  // in ra ở xem dự đoán). Song song với xuất_hiện và danh_sách, bản ghi lưu từ trước chưa có trường này.
+  vị_trí?: number[]
 }
 
 export type Bộ_Lưu_Trữ = {
