@@ -1202,24 +1202,26 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
         </div>
         <div>Hiển thị chi tiết: <input v-model="có_hiển_thị_chi_tiết" type="checkbox" /></div>
         <template v-if="có_hiển_thị_chi_tiết">
-          *1* Cho: Xem dự đoán
-          <div>
-            - Lọc ít nhất
-            <select v-model="lọc_số_trùng_trong_cột">
-              <option v-for="giá_trị in [-1, 1, 2, 3]" :key="giá_trị" :value="giá_trị">
-                {{ giá_trị }}
-              </option>
-            </select>
-            cột có từ 2 số trở lên
-          </div>
-          <div>
-            - Lọc mỗi hàng tối đa
-            <select v-model="lọc_số_cùng_hàng">
-              <option v-for="giá_trị in [-1, 2, 3, 4]" :key="giá_trị" :value="giá_trị">
-                {{ giá_trị }}
-              </option>
-            </select>
-            số (điều kiện or, -1 là không lọc) *1*
+          <div :style="{ color: '#7dd3fc' }">
+            *1* Cho: Xem dự đoán
+            <div>
+              - Lọc ít nhất
+              <select v-model="lọc_số_trùng_trong_cột">
+                <option v-for="giá_trị in [-1, 1, 2, 3]" :key="giá_trị" :value="giá_trị">
+                  {{ giá_trị }}
+                </option>
+              </select>
+              cột có từ 2 số trở lên
+            </div>
+            <div>
+              - Lọc mỗi hàng tối đa
+              <select v-model="lọc_số_cùng_hàng">
+                <option v-for="giá_trị in [-1, 2, 3, 4]" :key="giá_trị" :value="giá_trị">
+                  {{ giá_trị }}
+                </option>
+              </select>
+              số (điều kiện or, -1 là không lọc) *1*
+            </div>
           </div>
         </template>
       </div>
@@ -1229,40 +1231,42 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
           <div>
             <button @click="xóa_hết_bộ_nhớ_đệm">Xoá hết bộ nhớ đệm</button>
           </div>
-          <div>
-            *1*
-            <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán 55</button>
-            <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_45)">thống kê dự đoán 45</button>
-            để lưu vào indexed DB
-          </div>
-          <div>
-            từ Indexed DB<button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55)">
-              phân tích và dự đoán 55</button
-            ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45)">
-              phân tích và dự đoán 45
-            </button>
-            chỉ mục
-            <input
-              type="text"
-              v-model="vị_trí_phân_tích"
-              placeholder="Nhập vị trí phân tích"
-              :style="{ width: '20px' }"
-            />
-            danh sách dự đoán
-            <input
-              type="text"
-              v-model="vị_trí_dự_đoán"
-              placeholder="Nhập vị trí dự đoán"
-              :style="{ width: '20px' }"
-            />
+          <div :style="{ color: '#7dd3fc' }">
             <div>
-              lọc nhóm từng trúng ở danh sách số
-              <input type="text" v-model="danh_sách_dự_đoán" :style="{ width: '20px' }" />
-              (khi chọn chỉ mục = 0) *1*
+              *1*
+              <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán 55</button>
+              <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_45)">thống kê dự đoán 45</button>
+              để lưu vào indexed DB
+            </div>
+            <div>
+              từ Indexed DB<button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55)">
+                phân tích và dự đoán 55</button
+              ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45)">
+                phân tích và dự đoán 45
+              </button>
+              chỉ mục
+              <input
+                type="text"
+                v-model="vị_trí_phân_tích"
+                placeholder="Nhập vị trí phân tích"
+                :style="{ width: '20px' }"
+              />
+              danh sách dự đoán
+              <input
+                type="text"
+                v-model="vị_trí_dự_đoán"
+                placeholder="Nhập vị trí dự đoán"
+                :style="{ width: '20px' }"
+              />
+              <div>
+                lọc nhóm từng trúng ở danh sách số
+                <input type="text" v-model="danh_sách_dự_đoán" :style="{ width: '20px' }" />
+                (khi chọn chỉ mục = 0) *1*
+              </div>
             </div>
           </div>
         </div>
-        <div>
+        <div :style="{ color: '#fcd34d' }">
           *2* Số Xuất hiện nhiều lần: vị trí dự đoán:
           <input v-model="vị_trí_xem_số_lần_xuất_hiện" type="text" :style="{ width: '20px' }" />
           bao nhiêu lần:
@@ -1277,7 +1281,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
           <input v-model="chu_kỳ_số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
           <button @click="lọc_dữ_liệu_theo_số_lần_xuất_hiện()">Lọc</button> *2*
         </div>
-        <div>
+        <div :style="{ color: '#86efac' }">
           *3* Bộ vé phủ: kỳ
           <input v-model="vị_trí_kỳ_bộ_vé_phủ" type="text" :style="{ width: '30px' }" />
           nhóm
@@ -1297,7 +1301,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
           </select>
           <button @click="đối_chiếu_vé_đã_lưu('vé phủ')">đối chiếu vé đã lưu</button> *3*
         </div>
-        <div>
+        <div :style="{ color: '#f9a8d4' }">
           *4* Vé mục tiêu (55: {{ SỐ_VÉ_MỤC_TIÊU[55] }}, 45: {{ SỐ_VÉ_MỤC_TIÊU[45] }}) chiến lược
           <select v-model="chiến_lược_vé">
             <option v-for="tên in Object.keys(CÁC_CHIẾN_LƯỢC)" :key="tên" :value="tên">
@@ -1315,7 +1319,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
           </select>
           <button @click="đối_chiếu_vé_đã_lưu('vé mục tiêu')">đối chiếu vé đã lưu</button> *4*
         </div>
-        <div>
+        <div :style="{ color: '#c4b5fd' }">
           *5* Vé từ danh sách xuất hiện (công thức cố định, ít nhất 1 cột 2 số, mỗi hàng tối đa 3 số):
           kỳ
           <input v-model="vị_trí_kỳ_tạo_vé" type="text" :style="{ width: '30px' }" />
