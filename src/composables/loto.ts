@@ -46,7 +46,7 @@ export function phân_tích_dữ_liệu_loto(nội_dung: string): {
     const ngày_xổ = phân_tích_ngày(ngày)
     const mã_tuần = lấy_chủ_nhật_đầu_tuần(ngày_xổ).getTime()
     if (!các_tuần.has(mã_tuần)) các_tuần.set(mã_tuần, new Map())
-    // khóa theo tên + thứ vì TP.HCM quay cả thứ 2 và thứ 7
+    // khóa theo tên + thứ vì Hồ Chí Minh quay cả thứ 2 và thứ 7
     các_tuần.get(mã_tuần)!.set(`${tên}|${ngày_xổ.getDay()}`, { ngày, các_lô })
   }
   const kết_quả = [...các_tuần.entries()]
