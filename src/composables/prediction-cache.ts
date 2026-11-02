@@ -10,6 +10,7 @@ export const TIỀN_TỐ_DS_DỰ_ĐOÁN = 'ds_dự_đoán_'
 export type Dự_Đoán_Đã_Lưu = {
   dấu_vân_tay: string
   dự_đoán_ds_xuất_hiện: string[][][]
+  số_lần_xuất_hiện_ds: number[][][]
   vị_trí_ds_xuất_hiện: number[][][]
 }
 

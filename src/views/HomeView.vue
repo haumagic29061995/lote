@@ -2,13 +2,19 @@
 import { ref, h, type Ref } from 'vue'
 import moment from 'moment'
 
-import { lấy_dữ_liệu_xổ_số_45, lấy_dữ_liệu_xổ_số_55, tạo_ds_xuất_hiện } from '@/composables/lote'
+import {
+  lấy_dữ_liệu_xổ_số_45,
+  lấy_dữ_liệu_xổ_số_55,
+  tạo_ds_xuất_hiện_kèm_số_lần,
+} from '@/composables/lote'
 
 import { tạo_bộ_vé_phủ, tạo_seed_từ_chuỗi } from '@/composables/ticket-optimizer'
 import {
   đánh_giá_bộ_vé,
   tạo_bộ_vị_trí_cố_định,
   tạo_vé_từ_danh_sách,
+  tạo_bộ_lọc_loại_vé_giống,
+  tạo_vé_theo_số_lần_xuất_hiện,
 } from '@/composables/position-ticket'
 import {
   CÁC_CHIẾN_LƯỢC,
@@ -50,7 +56,7 @@ const LOTE_55_HẰNG_SỐ = 'lote_55'
 const SỐ_XUẤT_HIỆN_45 = 40
 const SỐ_XUẤT_HIỆN_55 = 46
 // tăng số này khi đổi thuật toán tạo danh sách dự đoán để bỏ cache cũ trong IndexedDB
-const PHIÊN_BẢN_BỘ_NHỚ_ĐỆM = 1
+const PHIÊN_BẢN_BỘ_NHỚ_ĐỆM = 2
 
 // Xoá cả danh sách dự đoán lẫn các bộ vé đã lưu để đối chiếu
 async function xóa_hết_bộ_nhớ_đệm() {
@@ -94,6 +100,13 @@ const có_hiển_thị_chi_tiết = ref<boolean>(false)
 const SỐ_VỊ_TRÍ_MỖI_HÀNG = 6
 const lọc_số_trùng_trong_cột = ref<number>(1)
 const lọc_số_cùng_hàng = ref<number>(2)
+// "tạo dự đoán": chỉ dùng các số có số lần xuất hiện trong khoảng này (tối đa 6), tạo tối đa chừng này vé mỗi danh sách
+const SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA = 6
+const số_lần_xuất_hiện_từ = ref<number>(1)
+const số_lần_xuất_hiện_tới = ref<number>(2)
+const số_lượng_vé_dự_đoán = ref<number>(40)
+// loại vé giống từ ngần này vị trí với một bộ trong thống kê dự đoán (0 là không loại)
+const số_vị_trí_giống_để_loại = ref<number>(4)
 
 // số vị trí nằm trong từng nhóm (cột hoặc hàng) có ít nhất 1 vị trí
 function đếm_vị_trí_mỗi_nhóm(ds_vị_trí: number[], lấy_nhóm: (vị_trí: number) => number): number[] {
@@ -189,10 +202,12 @@ async function chuẩn_bị_ds_dự_đoán() {
     if (
       đã_lưu?.dấu_vân_tay === dấu_vân_tay &&
       đã_lưu.dự_đoán_ds_xuất_hiện.length === danh_sách_dữ_liệu.length &&
+      đã_lưu.số_lần_xuất_hiện_ds?.length === danh_sách_dữ_liệu.length &&
       đã_lưu.vị_trí_ds_xuất_hiện.length === danh_sách_dữ_liệu.length
     ) {
       danh_sách_dữ_liệu.forEach((dữ_liệu, vị_trí) => {
         dữ_liệu.dự_đoán_ds_xuất_hiện = đã_lưu.dự_đoán_ds_xuất_hiện[vị_trí]
+        dữ_liệu.số_lần_xuất_hiện_ds = đã_lưu.số_lần_xuất_hiện_ds[vị_trí]
         dữ_liệu.vị_trí_ds_xuất_hiện = đã_lưu.vị_trí_ds_xuất_hiện[vị_trí]
       })
       console.log(`đã tải danh sách dự đoán ${loại_xổ_số} từ bộ nhớ đệm`)
@@ -210,6 +225,7 @@ async function chuẩn_bị_ds_dự_đoán() {
     await ghi_bộ_nhớ_đệm<Dự_Đoán_Đã_Lưu>(khóa, {
       dấu_vân_tay,
       dự_đoán_ds_xuất_hiện: danh_sách_dữ_liệu.map((dữ_liệu) => dữ_liệu.dự_đoán_ds_xuất_hiện),
+      số_lần_xuất_hiện_ds: danh_sách_dữ_liệu.map((dữ_liệu) => dữ_liệu.số_lần_xuất_hiện_ds),
       vị_trí_ds_xuất_hiện: danh_sách_dữ_liệu.map((dữ_liệu) => dữ_liệu.vị_trí_ds_xuất_hiện),
     })
     console.log(`đã tạo và lưu danh sách dự đoán ${loại_xổ_số} vào bộ nhớ đệm`)
@@ -340,16 +356,21 @@ function hiển_thị_danh_sách_xuất_hiện(dữ_liệu: Đối_Tượng_Xổ
   )
 }
 
-function hiển_thị_ds_dự_đoán_xuất_hiện(danh_sách: string[], dữ_liệu: Đối_Tượng_Xổ_Số) {
+function hiển_thị_ds_dự_đoán_xuất_hiện(
+  danh_sách: string[],
+  dữ_liệu: Đối_Tượng_Xổ_Số,
+  vị_trí_danh_sách: number,
+) {
+  const số_lần = dữ_liệu.số_lần_xuất_hiện_ds[vị_trí_danh_sách] || []
   const kết_quả_sau_đó = dữ_liệu.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số || []
   const kết_quả_hiện_tại = dữ_liệu.kết_quả_xổ_số || []
   return h(
     'div',
-    { style: { width: '220px', display: 'flex', flexWrap: 'wrap' } },
+    { style: { width: '240px', display: 'flex', flexWrap: 'wrap' } },
     danh_sách.map((số_dự_đoán, vị_trí) =>
       h(
         'div',
-        { key: `row-dự_đoán${vị_trí}`, style: { width: '34px' } },
+        { key: `row-dự_đoán${vị_trí}`, style: { width: '40px' } },
         h(
           'span',
           {
@@ -358,7 +379,8 @@ function hiển_thị_ds_dự_đoán_xuất_hiện(danh_sách: string[], dữ_li
               border: kết_quả_hiện_tại.includes(số_dự_đoán) ? '1px solid blue' : null,
             },
           },
-          `${số_dự_đoán}`,
+          // số kèm số lần xuất hiện, ví dụ "07:3"
+          số_lần[vị_trí] === undefined ? `${số_dự_đoán}` : `${số_dự_đoán}:${số_lần[vị_trí]}`,
         ),
       ),
     ),
@@ -371,13 +393,15 @@ function tạo_ds_xuất_hiện_tại_vị_trí_chỉ_định(
   dữ_liệu: Đối_Tượng_Xổ_Số,
   vị_trí_dữ_liệu: number,
 ) {
-  dữ_liệu.dự_đoán_ds_xuất_hiện = tạo_ds_xuất_hiện(
+  const ds_xuất_hiện = tạo_ds_xuất_hiện_kèm_số_lần(
     danh_sách_dữ_liệu,
     danh_sách_dữ_liệu_khác,
     dữ_liệu,
     vị_trí_dữ_liệu,
     dữ_liệu.loại_xổ_số === 55 ? SỐ_XUẤT_HIỆN_55 : SỐ_XUẤT_HIỆN_45,
   )
+  dữ_liệu.dự_đoán_ds_xuất_hiện = ds_xuất_hiện.danh_sách
+  dữ_liệu.số_lần_xuất_hiện_ds = ds_xuất_hiện.số_lần
 
   if (vị_trí_dữ_liệu > 0) {
     const kết_quả_sau_đó = danh_sách_dữ_liệu[vị_trí_dữ_liệu - 1]?.kết_quả_xổ_số || []
@@ -731,6 +755,94 @@ function in_đánh_giá_vé(vé: string[][], kỳ_sau: Đối_Tượng_Xổ_Số
 }
 
 // công thức cố định: cùng một bộ vị trí áp lên danh sách xuất hiện của kỳ đã chọn (0 là kỳ mới nhất)
+// tạo dự đoán cho kỳ mới nhất từ danh sách chính và từng danh sách phụ, chỉ in log
+async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
+  const từ = Number(số_lần_xuất_hiện_từ.value)
+  const tới = Number(số_lần_xuất_hiện_tới.value)
+  const số_vé = Number(số_lượng_vé_dự_đoán.value)
+  if (!(từ >= 1 && từ <= tới && tới <= SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA)) {
+    console.warn(`Số lần xuất hiện phải từ 1 đến ${SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA} và "từ" không lớn hơn "tới"`)
+    return
+  }
+  if (!Number.isInteger(số_vé) || số_vé < 1) {
+    console.warn('Số lượng vé phải là số nguyên từ 1 trở lên')
+    return
+  }
+
+  const số_giống = Number(số_vị_trí_giống_để_loại.value)
+  if (!Number.isInteger(số_giống) || số_giống < 0 || số_giống > 6) {
+    console.warn('Số vị trí giống để loại phải là số nguyên từ 0 đến 6 (0 là không loại)')
+    return
+  }
+  // bộ vị trí đã từng trúng từ 5 số (thống kê dự đoán): vé giống nhiều vị trí với bộ này bị loại
+  let bộ_vị_trí_thống_kê: number[][] = []
+  if (số_giống > 0) {
+    await dịch_vụ_indexeddb.khởi_tạo()
+    const đã_lưu = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(lấy_tên_lưu_trữ(danh_sách_dữ_liệu))
+    bộ_vị_trí_thống_kê = (đã_lưu[0]?.dữ_liệu ?? []).map((mục) => mục.ds_vị_trí)
+    if (bộ_vị_trí_thống_kê.length === 0) {
+      console.warn('Chưa có thống kê dự đoán đã lưu nên không loại được vé nào, hãy bấm "thống kê dự đoán" trước')
+    }
+  }
+  const không_giống_thống_kê = tạo_bộ_lọc_loại_vé_giống(bộ_vị_trí_thống_kê, số_giống)
+
+  const kỳ = danh_sách_dữ_liệu[0]
+  const ngày_dự_đoán = lấy_ngày_dự_đoán(kỳ)
+  // danh sách chính xếp theo số lần tăng dần như các danh sách phụ để có vị trí cột/hàng
+  const danh_sách_chính = [...kỳ.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện].sort(
+    (a, b) => a.tổng_xuất_hiện - b.tổng_xuất_hiện,
+  )
+  const các_danh_sách = [
+    {
+      tên: 'danh sách chính',
+      số: danh_sách_chính.map((mục) => mục.số_xuất_hiện),
+      số_lần: danh_sách_chính.map((mục) => mục.tổng_xuất_hiện),
+    },
+    ...kỳ.dự_đoán_ds_xuất_hiện.map((danh_sách, chỉ_số) => ({
+      tên: `danh sách phụ ${chỉ_số}`,
+      số: danh_sách,
+      số_lần: kỳ.số_lần_xuất_hiện_ds[chỉ_số] ?? [],
+    })),
+  ]
+
+  console.group(
+    `Tạo dự đoán ${kỳ.loại_xổ_số} cho kỳ ${ngày_dự_đoán} (dữ liệu mới nhất ${kỳ.ngày_xổ_số}): số lần xuất hiện ${từ} đến ${tới}, tối đa ${số_vé} vé mỗi danh sách`,
+  )
+  console.log(
+    `lọc: ít nhất ${lọc_số_trùng_trong_cột.value} cột từ 2 số, mỗi hàng tối đa ${lọc_số_cùng_hàng.value} số (-1 là không lọc, điều kiện or)`,
+  )
+  console.log(
+    số_giống > 0
+      ? `loại vé giống từ ${số_giống} vị trí với ${bộ_vị_trí_thống_kê.length} bộ trong thống kê dự đoán`
+      : 'không loại vé theo thống kê dự đoán',
+  )
+
+  let tổng_vé = 0
+  các_danh_sách.forEach(({ tên, số, số_lần }, thứ_tự) => {
+    const { vé, số_ứng_viên } = tạo_vé_theo_số_lần_xuất_hiện(
+      số,
+      số_lần,
+      từ,
+      tới,
+      số_vé,
+      (ds_vị_trí) => qua_bộ_lọc_vị_trí(ds_vị_trí) && không_giống_thống_kê(ds_vị_trí),
+      tạo_bộ_sinh_ngẫu_nhiên(
+        tạo_seed_từ_chuỗi(`${kỳ.loại_xổ_số}|${kỳ.ngày_xổ_số}|${tên}|${từ}|${tới}|${số_vé}|${số_giống}`),
+      ),
+    )
+    tổng_vé += vé.length
+    // danh sách chính mở sẵn, các danh sách phụ thu gọn cho đỡ dài
+    const tiêu_đề = `${tên}: ${vé.length} vé (${số_ứng_viên} số có số lần ${từ} đến ${tới}, tổng ${số.length} số)`
+    if (thứ_tự === 0) console.group(tiêu_đề)
+    else console.groupCollapsed(tiêu_đề)
+    if (số_ứng_viên < 6) console.log('không đủ 6 số để tạo vé')
+    else console.log(vé.map((một_vé) => một_vé.join(' ')).join('\n'))
+    console.groupEnd()
+  })
+  console.log(`tổng ${tổng_vé} vé từ ${các_danh_sách.length} danh sách`)
+  console.groupEnd()
+}
+
 function tạo_và_in_vé_từ_danh_sách(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
   const vị_trí_kỳ = Number(vị_trí_kỳ_tạo_vé.value)
   const dữ_liệu = danh_sách_dữ_liệu[vị_trí_kỳ]
@@ -1222,6 +1334,30 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
               </select>
               số (điều kiện or, -1 là không lọc) *1*
             </div>
+            <div>
+              - Tạo dự đoán: số lần xuất hiện từ
+              <select v-model="số_lần_xuất_hiện_từ">
+                <option v-for="giá_trị in SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA" :key="giá_trị" :value="giá_trị">
+                  {{ giá_trị }}
+                </option>
+              </select>
+              tới
+              <select v-model="số_lần_xuất_hiện_tới">
+                <option v-for="giá_trị in SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA" :key="giá_trị" :value="giá_trị">
+                  {{ giá_trị }}
+                </option>
+              </select>
+              , số lượng vé
+              <input v-model="số_lượng_vé_dự_đoán" type="text" :style="{ width: '30px' }" />
+              , loại vé giống
+              <input v-model="số_vị_trí_giống_để_loại" type="text" :style="{ width: '20px' }" />
+              vị trí với thống kê dự đoán (0 là không loại)
+            </div>
+            <div>
+              <button @click="tạo_dự_đoán_cho_các_danh_sách(dữ_liệu_xổ_số_55)">tạo dự đoán 55</button>
+              <button @click="tạo_dự_đoán_cho_các_danh_sách(dữ_liệu_xổ_số_45)">tạo dự đoán 45</button>
+              cho danh sách chính và các danh sách phụ
+            </div>
           </div>
         </template>
       </div>
@@ -1396,7 +1532,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
               <div v-for="(ds, vị_trí_xh) in dữ_liệu.dự_đoán_ds_xuất_hiện" :key="`${vị_trí_xh}ds`">
                 <div>
                   {{ vị_trí_xh
-                  }}<component :is="() => hiển_thị_ds_dự_đoán_xuất_hiện(ds, dữ_liệu)" />
+                  }}<component :is="() => hiển_thị_ds_dự_đoán_xuất_hiện(ds, dữ_liệu, vị_trí_xh)" />
                 </div>
                 <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_55, dữ_liệu, vị_trí_xh)">
                   xem dự đoán
@@ -1451,7 +1587,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
               <div v-for="(ds, vị_trí_xh) in dữ_liệu.dự_đoán_ds_xuất_hiện" :key="`${vị_trí_xh}ds`">
                 <div>
                   {{ vị_trí_xh
-                  }}<component :is="() => hiển_thị_ds_dự_đoán_xuất_hiện(ds, dữ_liệu)" />
+                  }}<component :is="() => hiển_thị_ds_dự_đoán_xuất_hiện(ds, dữ_liệu, vị_trí_xh)" />
                 </div>
                 <button @click="xem_dự_đoán_cho_tất_cả(dữ_liệu_xổ_số_45, dữ_liệu, vị_trí_xh)">
                   xem dự đoán

@@ -162,14 +162,21 @@ function lấy_số_theo_kỳ(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ
   return số_theo_kỳ
 }
 
-export const tạo_ds_xuất_hiện = (
+export type Ds_Xuất_Hiện_Kèm_Số_Lần = {
+  danh_sách: string[][]
+  // số_lần[a][b] là số lần xuất hiện của số danh_sách[a][b]
+  số_lần: number[][]
+}
+
+export const tạo_ds_xuất_hiện_kèm_số_lần = (
   danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
   danh_sách_dữ_liệu_khác: Array<Đối_Tượng_Xổ_Số>,
   đối_tượng: Đối_Tượng_Xổ_Số,
   vị_trí: number,
   bao_nhiêu_xuất_hiện: number = 46,
-): string[][] => {
+): Ds_Xuất_Hiện_Kèm_Số_Lần => {
   const kết_quả_xuất_hiện: string[][] = []
+  const số_lần_xuất_hiện: number[][] = []
 
   const số_theo_kỳ = lấy_số_theo_kỳ(danh_sách_dữ_liệu)
   const số_theo_kỳ_khác = lấy_số_theo_kỳ(danh_sách_dữ_liệu_khác)
@@ -199,14 +206,18 @@ export const tạo_ds_xuất_hiện = (
 
     if (thứ_tự_xuất_hiện.length === bao_nhiêu_xuất_hiện) {
       // sort ổn định: số bằng tổng giữ nguyên thứ tự xuất hiện lần đầu
-      const kết_quả = [...thứ_tự_xuất_hiện]
-        .sort((a, b) => tổng_xuất_hiện[a] - tổng_xuất_hiện[b])
-        .map((số) => nhãn_theo_số[số])
-      kết_quả_xuất_hiện.push(kết_quả)
+      const đã_sắp_xếp = [...thứ_tự_xuất_hiện].sort((a, b) => tổng_xuất_hiện[a] - tổng_xuất_hiện[b])
+      kết_quả_xuất_hiện.push(đã_sắp_xếp.map((số) => nhãn_theo_số[số]))
+      số_lần_xuất_hiện.push(đã_sắp_xếp.map((số) => tổng_xuất_hiện[số]))
     }
 
     danh_sách_đã_thêm.forEach((số) => tổng_xuất_hiện[số]--)
     thứ_tự_xuất_hiện.length = độ_dài_trước_khi_thêm
   }
-  return kết_quả_xuất_hiện
+  return { danh_sách: kết_quả_xuất_hiện, số_lần: số_lần_xuất_hiện }
 }
+
+// chỉ lấy các danh sách, không cần số lần xuất hiện
+export const tạo_ds_xuất_hiện = (
+  ...tham_số: Parameters<typeof tạo_ds_xuất_hiện_kèm_số_lần>
+): string[][] => tạo_ds_xuất_hiện_kèm_số_lần(...tham_số).danh_sách

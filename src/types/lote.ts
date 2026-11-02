@@ -51,6 +51,8 @@ export class Đối_Tượng_Xổ_Số {
 
   // Tạo DS xuất hiện
   dự_đoán_ds_xuất_hiện: string[][] = []
+  // số lần xuất hiện của từng số trong dự_đoán_ds_xuất_hiện (cùng chỉ số danh sách, cùng thứ tự số)
+  số_lần_xuất_hiện_ds: number[][] = []
   hiển_thị_dự_đoán_ds_xuất_hiện: boolean = false
   vị_trí_ds_xuất_hiện: number[][] = []
   xem_dự_đoán: string = ''

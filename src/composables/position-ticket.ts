@@ -157,3 +157,93 @@ export function đánh_giá_bộ_vé(vé: string[][], kỳ_sau: Đối_Tượng_
     vé_trúng_từ_4: vé_trúng_từ_4.sort((a, b) => b.số_trúng - a.số_trúng),
   }
 }
+
+export type Vé_Theo_Số_Lần = { vé: string[][]; số_ứng_viên: number }
+
+/**
+ * Tạo tối đa `số_vé` vé 6 số từ các số của một danh sách có số lần xuất hiện trong [từ, tới].
+ * `lọc_vị_trí` nhận vị trí (chỉ số trong danh sách, xếp lưới 6 cột) của 6 số, dùng để áp điều kiện cột/hàng.
+ * Không hai vé nào chung từ 4 số trở lên để các vé khác nhau nhiều. `ngẫu_nhiên` có seed thì kết quả lặp lại được.
+ */
+export function tạo_vé_theo_số_lần_xuất_hiện(
+  danh_sách: string[],
+  số_lần: number[],
+  từ: number,
+  tới: number,
+  số_vé: number,
+  lọc_vị_trí: (ds_vị_trí: number[]) => boolean,
+  ngẫu_nhiên: () => number,
+): Vé_Theo_Số_Lần {
+  const ứng_viên = danh_sách
+    .map((_, vị_trí) => vị_trí)
+    .filter((vị_trí) => số_lần[vị_trí] >= từ && số_lần[vị_trí] <= tới)
+  if (ứng_viên.length < SỐ_VỊ_TRÍ_MỖI_VÉ) return { vé: [], số_ứng_viên: ứng_viên.length }
+
+  const vé: string[][] = []
+  const đã_dùng = new Set<number>()
+  const nguồn = [...ứng_viên]
+  const số_lần_thử_tối_đa = số_vé * 300
+
+  for (let lần_thử = 0; lần_thử < số_lần_thử_tối_đa && vé.length < số_vé; lần_thử++) {
+    // chọn ngẫu nhiên 6 vị trí không lặp (Fisher-Yates từng phần)
+    for (let i = 0; i < SỐ_VỊ_TRÍ_MỖI_VÉ; i++) {
+      const j = i + Math.floor(ngẫu_nhiên() * (nguồn.length - i))
+      ;[nguồn[i], nguồn[j]] = [nguồn[j], nguồn[i]]
+    }
+    const ds_vị_trí = nguồn.slice(0, SỐ_VỊ_TRÍ_MỖI_VÉ).sort((a, b) => a - b)
+    if (!lọc_vị_trí(ds_vị_trí)) continue
+
+    const các_khóa = CÁC_TẬP_4_TRONG_6.map(
+      (tập) =>
+        ((ds_vị_trí[tập[0]] * 128 + ds_vị_trí[tập[1]]) * 128 + ds_vị_trí[tập[2]]) * 128 +
+        ds_vị_trí[tập[3]],
+    )
+    if (các_khóa.some((khóa) => đã_dùng.has(khóa))) continue
+    các_khóa.forEach((khóa) => đã_dùng.add(khóa))
+    vé.push(ds_vị_trí.map((vị_trí) => danh_sách[vị_trí]).sort())
+  }
+  return { vé, số_ứng_viên: ứng_viên.length }
+}
+
+// các tập con gồm `cỡ` chỉ số trong 0..5
+function tạo_tập_con_chỉ_số(cỡ: number): number[][] {
+  const kết_quả: number[][] = []
+  const đi = (bắt_đầu: number, hiện_tại: number[]) => {
+    if (hiện_tại.length === cỡ) return void kết_quả.push([...hiện_tại])
+    for (let i = bắt_đầu; i < SỐ_VỊ_TRÍ_MỖI_VÉ; i++) đi(i + 1, [...hiện_tại, i])
+  }
+  đi(0, [])
+  return kết_quả
+}
+
+/**
+ * Bộ lọc loại vé giống `số_giống` vị trí trở lên với một bộ vị trí đã biết (vd bộ trong thống kê dự đoán).
+ * Trả về hàm nhận 6 vị trí đã sắp xếp: true là giữ lại, false là phải loại. `số_giống` ngoài 1..6 thì không loại gì.
+ */
+export function tạo_bộ_lọc_loại_vé_giống(
+  các_bộ_vị_trí: number[][],
+  số_giống: number,
+): (ds_vị_trí: number[]) => boolean {
+  if (!Number.isInteger(số_giống) || số_giống < 1 || số_giống > SỐ_VỊ_TRÍ_MỖI_VÉ) return () => true
+  const các_tập = tạo_tập_con_chỉ_số(số_giống)
+  const tạo_khóa = (ds: number[], tập: number[]) => tập.reduce((khóa, i) => khóa * 128 + ds[i], 0)
+  const khóa_đã_biết = new Set<number>()
+  các_bộ_vị_trí.forEach((bộ) => {
+    if (bộ.length < số_giống) return
+    const đã_sắp_xếp = [...bộ].sort((a, b) => a - b)
+    // bộ dài hơn 6 vẫn xét đủ mọi tổ hợp
+    const tập_bộ = bộ.length === SỐ_VỊ_TRÍ_MỖI_VÉ ? các_tập : tổ_hợp_chỉ_số(bộ.length, số_giống)
+    tập_bộ.forEach((tập) => khóa_đã_biết.add(tạo_khóa(đã_sắp_xếp, tập)))
+  })
+  return (ds_vị_trí) => !các_tập.some((tập) => khóa_đã_biết.has(tạo_khóa(ds_vị_trí, tập)))
+}
+
+function tổ_hợp_chỉ_số(tổng: number, cỡ: number): number[][] {
+  const kết_quả: number[][] = []
+  const đi = (bắt_đầu: number, hiện_tại: number[]) => {
+    if (hiện_tại.length === cỡ) return void kết_quả.push([...hiện_tại])
+    for (let i = bắt_đầu; i < tổng; i++) đi(i + 1, [...hiện_tại, i])
+  }
+  đi(0, [])
+  return kết_quả
+}
