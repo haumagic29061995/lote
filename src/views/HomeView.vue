@@ -105,6 +105,8 @@ const có_hiển_thị_chi_tiết = ref<boolean>(false)
 const SỐ_VỊ_TRÍ_MỖI_HÀNG = 6
 const lọc_số_trùng_trong_cột = ref<number>(1)
 const lọc_số_cùng_hàng = ref<number>(2)
+// mỗi cột chứa tối đa ngần này số, áp dụng thêm (và) vào điều kiện cột/hàng ở trên
+const số_tối_đa_mỗi_cột = ref<number>(3)
 // "tạo dự đoán": chỉ dùng các số có số lần xuất hiện trong khoảng này (tối đa 6), tạo tối đa chừng này vé mỗi danh sách
 const SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA = 6
 const số_lần_xuất_hiện_từ = ref<number>(1)
@@ -126,9 +128,13 @@ function đếm_vị_trí_mỗi_nhóm(ds_vị_trí: number[], lấy_nhóm: (vị
 function qua_bộ_lọc_vị_trí(ds_vị_trí: number[]): boolean {
   const số_trùng_cột = Number(lọc_số_trùng_trong_cột.value)
   const số_cùng_hàng = Number(lọc_số_cùng_hàng.value)
-  if (số_trùng_cột === -1 && số_cùng_hàng === -1) return true
+  const tối_đa_mỗi_cột = Number(số_tối_đa_mỗi_cột.value)
 
   const đếm_theo_cột = đếm_vị_trí_mỗi_nhóm(ds_vị_trí, (vị_trí) => vị_trí % SỐ_VỊ_TRÍ_MỖI_HÀNG)
+  // giới hạn mỗi cột là điều kiện "và", không nằm trong điều kiện "hoặc" giữa cột và hàng
+  if (Math.max(...đếm_theo_cột) > tối_đa_mỗi_cột) return false
+  if (số_trùng_cột === -1 && số_cùng_hàng === -1) return true
+
   const đếm_theo_hàng = đếm_vị_trí_mỗi_nhóm(ds_vị_trí, (vị_trí) =>
     Math.floor(vị_trí / SỐ_VỊ_TRÍ_MỖI_HÀNG),
   )
@@ -164,6 +170,8 @@ const các_ngày_dự_đoán_theo_số_lần_đã_lưu = ref<string[]>([])
 // '' là đánh giá mọi danh sách; các danh sách lấy từ những bản đã lưu của ngày đang chọn
 const danh_sách_đối_chiếu_dự_đoán = ref<string>('')
 const router = useRouter()
+// đóng/mở phần đầu trang (các nút và điều kiện dính ở trên cùng) để có thêm chỗ xem
+const đang_mở_đầu_trang = ref<boolean>(true)
 // mở trang riêng xem vé đã lưu theo ngày và danh sách đang chọn, trang mới đọc thẳng từ IndexedDB
 function mở_trang_xem_dự_đoán_đã_lưu() {
   const đường_dẫn = router.resolve({
@@ -765,7 +773,7 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
     `Tạo dự đoán ${kỳ.loại_xổ_số} cho kỳ ${ngày_dự_đoán} (dữ liệu mới nhất ${kỳ.ngày_xổ_số}): số lần xuất hiện ${từ} đến ${tới}, tối đa ${số_vé} vé mỗi danh sách`,
   )
   console.log(
-    `lọc: ít nhất ${lọc_số_trùng_trong_cột.value} cột từ 2 số, mỗi hàng tối đa ${lọc_số_cùng_hàng.value} số (-1 là không lọc, điều kiện or)`,
+    `lọc: ít nhất ${lọc_số_trùng_trong_cột.value} cột từ 2 số, mỗi hàng tối đa ${lọc_số_cùng_hàng.value} số (-1 là không lọc, điều kiện or), mỗi cột tối đa ${số_tối_đa_mỗi_cột.value} số`,
   )
   console.log(
     số_giống > 0
@@ -818,7 +826,7 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
   console.groupEnd()
 
   // mỗi tổ hợp điều kiện lưu một bản ghi riêng, tạo lại cùng điều kiện thì ghi đè đúng bản đó
-  const điều_kiện = `số lần ${từ}-${tới}, ${số_vé} vé, loại giống ${số_giống}, cột ${lọc_số_trùng_trong_cột.value}, hàng ${lọc_số_cùng_hàng.value}`
+  const điều_kiện = `số lần ${từ}-${tới}, ${số_vé} vé, loại giống ${số_giống}, cột ${lọc_số_trùng_trong_cột.value}, hàng ${lọc_số_cùng_hàng.value}, tối đa mỗi cột ${số_tối_đa_mỗi_cột.value}`
   await ghi_bộ_nhớ_đệm<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(
     `${TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN}${kỳ.loại_xổ_số}|${ngày_dự_đoán}|${điều_kiện}`,
     {
@@ -1305,10 +1313,11 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
         padding: '4px',
         zIndex: 1,
         display: 'flex',
-        'flex-direction': 'row',
-        gap: '12px',
+        'flex-direction': 'column',
+        gap: '4px',
       }"
     >
+      <div v-show="đang_mở_đầu_trang" :style="{ display: 'flex', 'flex-direction': 'row', gap: '12px' }">
       <div>
         <div :style="{ display: 'flex', gap: '20px', 'align-items': 'center' }">
           <div>
@@ -1368,7 +1377,16 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
                   {{ giá_trị }}
                 </option>
               </select>
-              số (điều kiện or, -1 là không lọc) *1*
+              số (điều kiện or, -1 là không lọc)
+            </div>
+            <div>
+              - Mỗi cột tối đa
+              <select v-model="số_tối_đa_mỗi_cột">
+                <option v-for="giá_trị in [2, 3, 4]" :key="giá_trị" :value="giá_trị">
+                  {{ giá_trị }}
+                </option>
+              </select>
+              số (điều kiện and với các lọc trên) *1*
             </div>
             <div>
               - Tạo dự đoán: số lần xuất hiện từ
@@ -1528,6 +1546,16 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
           </select>
           <button @click="đối_chiếu_vé_đã_lưu('danh sách')">đối chiếu vé đã lưu</button> *5*
         </div>
+      </div>
+      </div>
+      <div :style="{ textAlign: 'center' }">
+        <button
+          :style="{ width: '120px' }"
+          :title="đang_mở_đầu_trang ? 'đóng phần đầu trang' : 'mở phần đầu trang'"
+          @click="đang_mở_đầu_trang = !đang_mở_đầu_trang"
+        >
+          {{ đang_mở_đầu_trang ? '▲' : '▼' }}
+        </button>
       </div>
     </div>
 

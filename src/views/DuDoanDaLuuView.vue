@@ -78,41 +78,48 @@ function dựng_lưới(
   tên: string,
   vé: string[][],
   tập_kết_quả: Set<string>,
-): Ô_Lưới[] | undefined {
+): { lưới?: Ô_Lưới[]; lý_do?: string } {
   const loại = bản.loại_xổ_số === 55 ? 55 : 45
   const danh_sách_kỳ = dữ_liệu_xổ_số[loại]
   const vị_trí_kỳ = danh_sách_kỳ.findIndex((kỳ) => kỳ.ngày_xổ_số === bản.ngày_cơ_sở)
-  if (vị_trí_kỳ < 0) return
+  if (vị_trí_kỳ < 0) return { lý_do: `không tìm thấy kỳ ${bản.ngày_cơ_sở} trong dữ liệu hiện tại` }
 
   let số: string[] | undefined
   let số_lần: number[] | undefined
   if (tên === 'danh sách chính') {
     const danh_sách_chính = tính_danh_sách_chính_của_kỳ(loại, vị_trí_kỳ)
-    if (!danh_sách_chính) return
+    if (!danh_sách_chính) return { lý_do: 'không tính được danh sách chính của kỳ này' }
     const đã_sắp_xếp = [...danh_sách_chính].sort((a, b) => a.tổng_xuất_hiện - b.tổng_xuất_hiện)
     số = đã_sắp_xếp.map((mục) => mục.số_xuất_hiện)
     số_lần = đã_sắp_xếp.map((mục) => mục.tổng_xuất_hiện)
   } else {
     const chỉ_số = /^danh sách phụ (\d+)$/.exec(tên)?.[1]
     const đã_tính = ds_dự_đoán_đã_tính.value[bản.loại_xổ_số]
-    if (chỉ_số === undefined || !đã_tính || đã_tính.dự_đoán_ds_xuất_hiện.length !== danh_sách_kỳ.length) return
+    if (chỉ_số === undefined) return { lý_do: `không hiểu tên danh sách "${tên}"` }
+    if (!đã_tính) {
+      return { lý_do: 'chưa có bộ nhớ đệm danh sách dự đoán, hãy mở trang chính một lần để tính' }
+    }
+    if (đã_tính.dự_đoán_ds_xuất_hiện.length !== danh_sách_kỳ.length) {
+      return { lý_do: 'bộ nhớ đệm không khớp dữ liệu hiện tại (có kỳ mới), hãy mở trang chính một lần để tính lại' }
+    }
     số = đã_tính.dự_đoán_ds_xuất_hiện[vị_trí_kỳ]?.[Number(chỉ_số)]
     số_lần = đã_tính.số_lần_xuất_hiện_ds[vị_trí_kỳ]?.[Number(chỉ_số)]
   }
-  if (!số || !số_lần) return
+  if (!số || !số_lần) return { lý_do: 'bộ nhớ đệm không có danh sách này' }
 
   const khoảng = /số lần (\d+)-(\d+)/.exec(bản.điều_kiện)
   const từ = Number(khoảng?.[1] ?? 1)
   const tới = Number(khoảng?.[2] ?? 6)
   const đếm_vé = new Map<string, number>()
   vé.forEach((một_vé) => một_vé.forEach((s) => đếm_vé.set(s, (đếm_vé.get(s) ?? 0) + 1)))
-  return số.map((s, vị_trí) => ({
+  const lưới = số.map((s, vị_trí) => ({
     số: s,
     lần: số_lần[vị_trí],
     trong_khoảng: số_lần[vị_trí] >= từ && số_lần[vị_trí] <= tới,
     số_vé_chứa: đếm_vé.get(s) ?? 0,
     trúng: tập_kết_quả.has(s),
   }))
+  return { lưới }
 }
 
 const các_nhóm_hiển_thị = computed(() =>
@@ -131,7 +138,7 @@ const các_nhóm_hiển_thị = computed(() =>
           }))
           return {
             tên: danh_sách.tên,
-            lưới: dựng_lưới(bản, danh_sách.tên, danh_sách.vé, tập_kết_quả),
+            ...dựng_lưới(bản, danh_sách.tên, danh_sách.vé, tập_kết_quả),
             vé,
             tổng_theo_mức: [3, 4, 5, 6].map((mức) => ({
               mức,
@@ -215,6 +222,9 @@ const các_nhóm_hiển_thị = computed(() =>
           >
             {{ ô.số }}:{{ ô.lần }}
           </div>
+        </div>
+        <div v-else-if="danh_sách.lý_do" :style="{ fontSize: '12px', opacity: 0.7 }">
+          không vẽ được lưới: {{ danh_sách.lý_do }}
         </div>
         <div :style="{ fontFamily: 'monospace', columnWidth: '17em', fontSize: '15px', lineHeight: 1.7 }">
           <div
