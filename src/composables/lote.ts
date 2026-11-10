@@ -5,7 +5,7 @@ import csv_dữ_liệu_45 from '@/assets/csv/lote45.csv?raw'
 
 import { LINK_CSV_LOTE_45, LINK_CSV_LOTE_55 } from '@/constants/lote'
 import { tải_csv_từ_link } from '@/composables/data-source'
-import { Đối_Tượng_Xổ_Số } from '@/types/lote'
+import { Đối_Tượng_Xổ_Số, type Loại_Dữ_Liệu_Xuât_Hiện } from '@/types/lote'
 
 import { lấy_dấu_thời_gian_của_các_kỳ_tiếp_theo } from '@/utils'
 
@@ -221,3 +221,98 @@ export const tạo_ds_xuất_hiện_kèm_số_lần = (
 export const tạo_ds_xuất_hiện = (
   ...tham_số: Parameters<typeof tạo_ds_xuất_hiện_kèm_số_lần>
 ): string[][] => tạo_ds_xuất_hiện_kèm_số_lần(...tham_số).danh_sách
+
+// danh sách chính của một kỳ: các số xuất hiện ở những kỳ nằm cách kỳ này đúng bằng giá trị từng số (cả kỳ của loại kia liền kề)
+export function xữ_lý_dữ_liệu_xuất_hiện(
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  dữ_liệu_1: Đối_Tượng_Xổ_Số,
+  dữ_liệu_2: Đối_Tượng_Xổ_Số | undefined,
+  vị_trí_dữ_liệu: number,
+) {
+  // xữ lý dữ liệu 1
+  dữ_liệu_1.kết_quả_xổ_số.forEach((số: string) => {
+    const vị_trí_từ_số_và_vị_trí_dữ_liệu: number = Number(số) + vị_trí_dữ_liệu
+    const dữ_liệu_từ_vị_trí_mới: Đối_Tượng_Xổ_Số = danh_sách_dữ_liệu[vị_trí_từ_số_và_vị_trí_dữ_liệu]
+    if (dữ_liệu_từ_vị_trí_mới) {
+      dữ_liệu_1.danh_sách_các_kết_quả_xổ_số_đã_xuất_hiện.push(dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số)
+      dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số.forEach((số2: string) => {
+        dữ_liệu_1.tập_các_số_đã_xuất_hiện.add(số2)
+        const dữ_liệu_tìm_thấy = dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.find(
+          (mục) => mục.số_xuất_hiện === số2,
+        )
+        if (dữ_liệu_tìm_thấy) {
+          dữ_liệu_tìm_thấy.tổng_xuất_hiện++
+        } else {
+          const dữ_liệu_xuất_hiện: Loại_Dữ_Liệu_Xuât_Hiện = {
+            số_xuất_hiện: số2,
+            tổng_xuất_hiện: 1,
+            là_số_kết_quả: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.includes(số2) || false,
+            là_số_jackpot_2: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.số_jacpot_2 === số2,
+            là_số_trùng: dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau.includes(số2),
+          }
+          dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.push(dữ_liệu_xuất_hiện)
+        }
+      })
+    }
+  })
+
+  // xữ lý dữ liệu 2
+  if (dữ_liệu_2) {
+    dữ_liệu_2.kết_quả_xổ_số
+      .filter((số0) => !dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau.includes(số0))
+      .forEach((số1: string) => {
+        const vị_trí_từ_số_và_vị_trí_dữ_liệu: number = Number(số1) + vị_trí_dữ_liệu
+        const dữ_liệu_từ_vị_trí_mới: Đối_Tượng_Xổ_Số =
+          danh_sách_dữ_liệu[vị_trí_từ_số_và_vị_trí_dữ_liệu]
+        if (dữ_liệu_từ_vị_trí_mới) {
+          dữ_liệu_1.danh_sách_các_kết_quả_xổ_số_đã_xuất_hiện.push(
+            dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số,
+          )
+          dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số.forEach((số2: string) => {
+            dữ_liệu_1.tập_các_số_đã_xuất_hiện.add(số2)
+            const dữ_liệu_tìm_thấy = dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.find(
+              (mục) => mục.số_xuất_hiện === số2,
+            )
+            if (dữ_liệu_tìm_thấy) {
+              dữ_liệu_tìm_thấy.tổng_xuất_hiện++
+            } else {
+              const dữ_liệu_xuất_hiện: Loại_Dữ_Liệu_Xuât_Hiện = {
+                số_xuất_hiện: số2,
+                tổng_xuất_hiện: 1,
+                là_số_kết_quả: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.includes(số2) || false,
+                là_số_jackpot_2: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.số_jacpot_2 === số2,
+                là_số_trùng: dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau.includes(số2),
+              }
+              dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.push(dữ_liệu_xuất_hiện)
+            }
+          })
+        }
+      })
+  }
+
+  // Số kết quả
+  dữ_liệu_1.số_kết_quả_trong_các_số_đã_xuất_hiện =
+    dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((num) =>
+      dữ_liệu_1.tập_các_số_đã_xuất_hiện.has(num),
+    ).length || 0
+}
+
+
+// tính danh sách chính của kỳ ở `vị_trí_kỳ` trong dữ liệu vừa nạp, giống cách trang chính tính;
+// dùng cho trang chỉ cần xem lại một kỳ mà không chạy lại toàn bộ
+export function tính_danh_sách_chính_của_kỳ(
+  loại_xổ_số: 45 | 55,
+  vị_trí_kỳ: number,
+): Loại_Dữ_Liệu_Xuât_Hiện[] | undefined {
+  const dữ_liệu_45 = lấy_dữ_liệu_xổ_số_45()
+  const dữ_liệu_55 = lấy_dữ_liệu_xổ_số_55()
+  // loại nào quay kế tiếp thì không cần bù trừ vị trí, loại còn lại lệch 1 kỳ
+  const loại_quay_tiếp = moment(dữ_liệu_45[0].ngày_xổ_số, 'DD/MM/YYYY') > moment(dữ_liệu_55[0].ngày_xổ_số, 'DD/MM/YYYY') ? 55 : 45
+  const bù_trừ = loại_quay_tiếp === loại_xổ_số ? 0 : -1
+  const danh_sách = loại_xổ_số === 45 ? dữ_liệu_45 : dữ_liệu_55
+  const danh_sách_khác = loại_xổ_số === 45 ? dữ_liệu_55 : dữ_liệu_45
+  const dữ_liệu = danh_sách[vị_trí_kỳ]
+  if (!dữ_liệu) return undefined
+  xữ_lý_dữ_liệu_xuất_hiện(danh_sách, dữ_liệu, danh_sách_khác[vị_trí_kỳ + bù_trừ], vị_trí_kỳ)
+  return dữ_liệu.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện
+}

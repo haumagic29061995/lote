@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, h, type Ref } from 'vue'
+import { ref, h, computed, watch, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
 import moment from 'moment'
 
 import {
   lấy_dữ_liệu_xổ_số_45,
   lấy_dữ_liệu_xổ_số_55,
   tạo_ds_xuất_hiện_kèm_số_lần,
+  xữ_lý_dữ_liệu_xuất_hiện,
 } from '@/composables/lote'
 
 import { tạo_bộ_vé_phủ, tạo_seed_từ_chuỗi } from '@/composables/ticket-optimizer'
@@ -14,6 +16,7 @@ import {
   tạo_bộ_vị_trí_cố_định,
   tạo_vé_từ_danh_sách,
   tạo_bộ_lọc_loại_vé_giống,
+  đếm_nhóm_vị_trí_đã_biết,
   tạo_vé_theo_số_lần_xuất_hiện,
 } from '@/composables/position-ticket'
 import {
@@ -34,8 +37,10 @@ import {
   TIỀN_TỐ_BỘ_VÉ_PHỦ,
   TIỀN_TỐ_VÉ_MỤC_TIÊU,
   TIỀN_TỐ_VÉ_TỪ_DANH_SÁCH,
+  TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN,
   type Bộ_Vé_Phủ_Đã_Lưu,
   type Dự_Đoán_Đã_Lưu,
+  type Dự_Đoán_Theo_Số_Lần_Đã_Lưu,
   type Vé_Mục_Tiêu_Đã_Lưu,
   type Vé_Từ_Danh_Sách_Đã_Lưu,
 } from '@/composables/prediction-cache'
@@ -153,6 +158,31 @@ const các_ngày_vé_danh_sách_đã_lưu = ref<string[]>([])
 // và cho vé mục tiêu (vé kỳ tới)
 const ngày_đối_chiếu_vé_mục_tiêu = ref<string>('')
 const các_ngày_vé_mục_tiêu_đã_lưu = ref<string[]>([])
+// và cho các vé của nút tạo dự đoán
+const ngày_đối_chiếu_dự_đoán = ref<string>('')
+const các_ngày_dự_đoán_theo_số_lần_đã_lưu = ref<string[]>([])
+// '' là đánh giá mọi danh sách; các danh sách lấy từ những bản đã lưu của ngày đang chọn
+const danh_sách_đối_chiếu_dự_đoán = ref<string>('')
+const router = useRouter()
+// mở trang riêng xem vé đã lưu theo ngày và danh sách đang chọn, trang mới đọc thẳng từ IndexedDB
+function mở_trang_xem_dự_đoán_đã_lưu() {
+  const đường_dẫn = router.resolve({
+    name: 'du-doan-da-luu',
+    query: { ngay: ngày_đối_chiếu_dự_đoán.value, ds: danh_sách_đối_chiếu_dự_đoán.value },
+  })
+  window.open(đường_dẫn.href, '_blank')
+}
+const các_danh_sách_dự_đoán_đã_lưu = ref<Array<{ ngày: string; tên: string }>>([])
+const tên_các_danh_sách_của_ngày_đang_chọn = computed(() => [
+  ...new Set(
+    các_danh_sách_dự_đoán_đã_lưu.value
+      .filter((mục) => !ngày_đối_chiếu_dự_đoán.value || mục.ngày === ngày_đối_chiếu_dự_đoán.value)
+      .map((mục) => mục.tên),
+  ),
+])
+watch(tên_các_danh_sách_của_ngày_đang_chọn, (tên_các_danh_sách) => {
+  if (!tên_các_danh_sách.includes(danh_sách_đối_chiếu_dự_đoán.value)) danh_sách_đối_chiếu_dự_đoán.value = ''
+})
 
 const vị_trí_phân_tích = ref<number>(1)
 const vị_trí_dự_đoán = ref<number>(2)
@@ -230,80 +260,6 @@ async function chuẩn_bị_ds_dự_đoán() {
     })
     console.log(`đã tạo và lưu danh sách dự đoán ${loại_xổ_số} vào bộ nhớ đệm`)
   }
-}
-
-function xữ_lý_dữ_liệu_xuất_hiện(
-  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
-  dữ_liệu_1: Đối_Tượng_Xổ_Số,
-  dữ_liệu_2: Đối_Tượng_Xổ_Số | undefined,
-  vị_trí_dữ_liệu: number,
-) {
-  // xữ lý dữ liệu 1
-  dữ_liệu_1.kết_quả_xổ_số.forEach((số: string) => {
-    const vị_trí_từ_số_và_vị_trí_dữ_liệu: number = Number(số) + vị_trí_dữ_liệu
-    const dữ_liệu_từ_vị_trí_mới: Đối_Tượng_Xổ_Số = danh_sách_dữ_liệu[vị_trí_từ_số_và_vị_trí_dữ_liệu]
-    if (dữ_liệu_từ_vị_trí_mới) {
-      dữ_liệu_1.danh_sách_các_kết_quả_xổ_số_đã_xuất_hiện.push(dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số)
-      dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số.forEach((số2: string) => {
-        dữ_liệu_1.tập_các_số_đã_xuất_hiện.add(số2)
-        const dữ_liệu_tìm_thấy = dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.find(
-          (mục) => mục.số_xuất_hiện === số2,
-        )
-        if (dữ_liệu_tìm_thấy) {
-          dữ_liệu_tìm_thấy.tổng_xuất_hiện++
-        } else {
-          const dữ_liệu_xuất_hiện: Loại_Dữ_Liệu_Xuât_Hiện = {
-            số_xuất_hiện: số2,
-            tổng_xuất_hiện: 1,
-            là_số_kết_quả: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.includes(số2) || false,
-            là_số_jackpot_2: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.số_jacpot_2 === số2,
-            là_số_trùng: dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau.includes(số2),
-          }
-          dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.push(dữ_liệu_xuất_hiện)
-        }
-      })
-    }
-  })
-
-  // xữ lý dữ liệu 2
-  if (dữ_liệu_2) {
-    dữ_liệu_2.kết_quả_xổ_số
-      .filter((số0) => !dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau.includes(số0))
-      .forEach((số1: string) => {
-        const vị_trí_từ_số_và_vị_trí_dữ_liệu: number = Number(số1) + vị_trí_dữ_liệu
-        const dữ_liệu_từ_vị_trí_mới: Đối_Tượng_Xổ_Số =
-          danh_sách_dữ_liệu[vị_trí_từ_số_và_vị_trí_dữ_liệu]
-        if (dữ_liệu_từ_vị_trí_mới) {
-          dữ_liệu_1.danh_sách_các_kết_quả_xổ_số_đã_xuất_hiện.push(
-            dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số,
-          )
-          dữ_liệu_từ_vị_trí_mới.kết_quả_xổ_số.forEach((số2: string) => {
-            dữ_liệu_1.tập_các_số_đã_xuất_hiện.add(số2)
-            const dữ_liệu_tìm_thấy = dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.find(
-              (mục) => mục.số_xuất_hiện === số2,
-            )
-            if (dữ_liệu_tìm_thấy) {
-              dữ_liệu_tìm_thấy.tổng_xuất_hiện++
-            } else {
-              const dữ_liệu_xuất_hiện: Loại_Dữ_Liệu_Xuât_Hiện = {
-                số_xuất_hiện: số2,
-                tổng_xuất_hiện: 1,
-                là_số_kết_quả: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.includes(số2) || false,
-                là_số_jackpot_2: dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.số_jacpot_2 === số2,
-                là_số_trùng: dữ_liệu_1.các_số_trùng_giữa_2_kết_quả_45_và_55_gần_nhau.includes(số2),
-              }
-              dữ_liệu_1.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện.push(dữ_liệu_xuất_hiện)
-            }
-          })
-        }
-      })
-  }
-
-  // Số kết quả
-  dữ_liệu_1.số_kết_quả_trong_các_số_đã_xuất_hiện =
-    dữ_liệu_1.dữ_liệu_kỳ_sau_đó?.kết_quả_xổ_số.filter((num) =>
-      dữ_liệu_1.tập_các_số_đã_xuất_hiện.has(num),
-    ).length || 0
 }
 
 chuẩn_bị_ds_dự_đoán().then(() => {
@@ -816,8 +772,23 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
       ? `loại vé giống từ ${số_giống} vị trí với ${bộ_vị_trí_thống_kê.length} bộ trong thống kê dự đoán`
       : 'không loại vé theo thống kê dự đoán',
   )
+  if (số_giống > 0 && bộ_vị_trí_thống_kê.length > 0) {
+    // số nhóm vị trí có thể có trong một danh sách (46 số của 55, 40 số của 45) để biết bộ lọc phủ kín cỡ nào
+    const số_số_trong_danh_sách = kỳ.loại_xổ_số === 55 ? 46 : 40
+    let tổng_nhóm = 1
+    for (let i = 0; i < số_giống; i++) tổng_nhóm = (tổng_nhóm * (số_số_trong_danh_sách - i)) / (i + 1)
+    const nhóm_đã_biết = đếm_nhóm_vị_trí_đã_biết(bộ_vị_trí_thống_kê, số_giống)
+    const phần_trăm = (nhóm_đã_biết / tổng_nhóm) * 100
+    console.log(
+      `thống kê đã chứa ${nhóm_đã_biết}/${Math.round(tổng_nhóm)} nhóm ${số_giống} vị trí (${phần_trăm.toFixed(1)}%)`,
+    )
+    if (phần_trăm > 80) {
+      console.warn(`Bộ lọc loại gần hết mọi vé, hãy tăng "loại vé giống" lên hoặc đặt 0 để không loại`)
+    }
+  }
 
   let tổng_vé = 0
+  const vé_theo_danh_sách: Array<{ tên: string; vé: string[][] }> = []
   các_danh_sách.forEach(({ tên, số, số_lần }, thứ_tự) => {
     const { vé, số_ứng_viên } = tạo_vé_theo_số_lần_xuất_hiện(
       số,
@@ -831,6 +802,7 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
       ),
     )
     tổng_vé += vé.length
+    if (vé.length > 0) vé_theo_danh_sách.push({ tên, vé })
     // danh sách chính mở sẵn, các danh sách phụ thu gọn cho đỡ dài
     const tiêu_đề = `${tên}: ${vé.length} vé (${số_ứng_viên} số có số lần ${từ} đến ${tới}, tổng ${số.length} số)`
     if (thứ_tự === 0) console.group(tiêu_đề)
@@ -839,8 +811,26 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
     else console.log(vé.map((một_vé) => một_vé.join(' ')).join('\n'))
     console.groupEnd()
   })
-  console.log(`tổng ${tổng_vé} vé từ ${các_danh_sách.length} danh sách`)
+  if (tổng_vé === 0) {
+    console.warn('Không danh sách nào tạo được vé, hãy nới điều kiện (số lần xuất hiện, lọc cột/hàng, số vị trí giống)')
+  }
+  console.log(`tổng ${tổng_vé} vé từ ${các_danh_sách.length} danh sách, đã lưu để đánh giá cho kỳ ${ngày_dự_đoán}`)
   console.groupEnd()
+
+  // mỗi tổ hợp điều kiện lưu một bản ghi riêng, tạo lại cùng điều kiện thì ghi đè đúng bản đó
+  const điều_kiện = `số lần ${từ}-${tới}, ${số_vé} vé, loại giống ${số_giống}, cột ${lọc_số_trùng_trong_cột.value}, hàng ${lọc_số_cùng_hàng.value}`
+  await ghi_bộ_nhớ_đệm<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(
+    `${TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN}${kỳ.loại_xổ_số}|${ngày_dự_đoán}|${điều_kiện}`,
+    {
+      loại_xổ_số: kỳ.loại_xổ_số,
+      ngày_cơ_sở: kỳ.ngày_xổ_số,
+      ngày_dự_đoán,
+      thời_điểm_tạo: Date.now(),
+      điều_kiện,
+      các_danh_sách: vé_theo_danh_sách,
+    },
+  )
+  await tải_ngày_dự_đoán_đã_lưu('dự đoán', ngày_dự_đoán)
 }
 
 function tạo_và_in_vé_từ_danh_sách(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
@@ -956,11 +946,12 @@ function tính_ngày_dự_đoán(kỳ_mới_nhất: Đối_Tượng_Xổ_Số): 
   ).format('DD/MM/YYYY')
 }
 
-type Loại_Nguồn_Vé = 'vé phủ' | 'danh sách' | 'vé mục tiêu'
+type Loại_Nguồn_Vé = 'vé phủ' | 'danh sách' | 'vé mục tiêu' | 'dự đoán'
 
 type Vé_Đã_Lưu_Chung = {
   loại_nguồn: Loại_Nguồn_Vé
   nguồn: string
+  tên_danh_sách?: string // chỉ có ở vé của tạo dự đoán
   loại_xổ_số: number
   ngày_cơ_sở: string
   ngày_dự_đoán: string
@@ -970,10 +961,11 @@ type Vé_Đã_Lưu_Chung = {
 
 // gộp mọi vé đã lưu (bộ vé phủ và vé từ danh sách xuất hiện), mới tạo nhất trước
 async function đọc_tất_cả_vé_đã_lưu(): Promise<Vé_Đã_Lưu_Chung[]> {
-  const [bộ_vé_phủ, vé_từ_danh_sách, vé_mục_tiêu] = await Promise.all([
+  const [bộ_vé_phủ, vé_từ_danh_sách, vé_mục_tiêu, dự_đoán_theo_số_lần] = await Promise.all([
     liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Bộ_Vé_Phủ_Đã_Lưu>(TIỀN_TỐ_BỘ_VÉ_PHỦ),
     liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Vé_Từ_Danh_Sách_Đã_Lưu>(TIỀN_TỐ_VÉ_TỪ_DANH_SÁCH),
     liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Vé_Mục_Tiêu_Đã_Lưu>(TIỀN_TỐ_VÉ_MỤC_TIÊU),
+    liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN),
   ])
   return [
     ...bộ_vé_phủ.map(({ giá_trị: bộ }) => ({
@@ -1003,6 +995,20 @@ async function đọc_tất_cả_vé_đã_lưu(): Promise<Vé_Đã_Lưu_Chung[]>
       thời_điểm_tạo: bộ.thời_điểm_tạo,
       vé: bộ.vé,
     })),
+    // mỗi danh sách của một lần tạo dự đoán là một dòng riêng để biết danh sách nào trúng
+    ...dự_đoán_theo_số_lần.flatMap(({ giá_trị: bộ }) =>
+      // bản không tạo được vé nào vẫn phải có mặt để ngày của nó hiện trong ô chọn ngày
+      (bộ.các_danh_sách?.length ? bộ.các_danh_sách : [{ tên: 'không có danh sách nào tạo được vé', vé: [] }]).map((danh_sách) => ({
+        loại_nguồn: 'dự đoán' as const,
+        nguồn: `${danh_sách.tên} (${bộ.điều_kiện})`,
+        tên_danh_sách: danh_sách.tên,
+        loại_xổ_số: bộ.loại_xổ_số,
+        ngày_cơ_sở: bộ.ngày_cơ_sở,
+        ngày_dự_đoán: bộ.ngày_dự_đoán,
+        thời_điểm_tạo: bộ.thời_điểm_tạo,
+        vé: danh_sách.vé,
+      })),
+    ),
   ].sort((a, b) => b.thời_điểm_tạo - a.thời_điểm_tạo)
 }
 
@@ -1011,22 +1017,25 @@ const ngày_đã_chọn_theo_nguồn: Record<Loại_Nguồn_Vé, Ref<string>> = 
   'vé phủ': ngày_dự_đoán_đối_chiếu,
   'danh sách': ngày_đối_chiếu_vé_danh_sách,
   'vé mục tiêu': ngày_đối_chiếu_vé_mục_tiêu,
+  'dự đoán': ngày_đối_chiếu_dự_đoán,
 }
 const các_ngày_theo_nguồn: Record<Loại_Nguồn_Vé, Ref<string[]>> = {
   'vé phủ': các_ngày_dự_đoán_đã_lưu,
   'danh sách': các_ngày_vé_danh_sách_đã_lưu,
   'vé mục tiêu': các_ngày_vé_mục_tiêu_đã_lưu,
+  'dự đoán': các_ngày_dự_đoán_theo_số_lần_đã_lưu,
 }
 
 // đọc các ngày dự đoán đang có trong IndexedDB cho một loại vé (mới nhất trước) để làm danh sách chọn
 async function tải_ngày_dự_đoán_đã_lưu(loại_nguồn: Loại_Nguồn_Vé, ngày_cần_chọn?: string) {
-  const các_ngày = [
-    ...new Set(
-      (await đọc_tất_cả_vé_đã_lưu())
-        .filter((bộ) => bộ.loại_nguồn === loại_nguồn)
-        .map((bộ) => bộ.ngày_dự_đoán),
-    ),
-  ].sort((a, b) => moment(b, 'DD/MM/YYYY').valueOf() - moment(a, 'DD/MM/YYYY').valueOf())
+  const các_bộ_cùng_loại = (await đọc_tất_cả_vé_đã_lưu()).filter((bộ) => bộ.loại_nguồn === loại_nguồn)
+  if (loại_nguồn === 'dự đoán') {
+    các_danh_sách_dự_đoán_đã_lưu.value = các_bộ_cùng_loại.map((bộ) => ({
+      ngày: bộ.ngày_dự_đoán,
+      tên: bộ.tên_danh_sách ?? '',
+    }))
+  }
+  const các_ngày = [...new Set(các_bộ_cùng_loại.map((bộ) => bộ.ngày_dự_đoán))].sort((a, b) => moment(b, 'DD/MM/YYYY').valueOf() - moment(a, 'DD/MM/YYYY').valueOf())
   các_ngày_theo_nguồn[loại_nguồn].value = các_ngày
 
   const ngày_đã_chọn = ngày_đã_chọn_theo_nguồn[loại_nguồn]
@@ -1041,6 +1050,7 @@ async function tải_ngày_dự_đoán_đã_lưu(loại_nguồn: Loại_Nguồn_
 tải_ngày_dự_đoán_đã_lưu('vé phủ')
 tải_ngày_dự_đoán_đã_lưu('danh sách')
 tải_ngày_dự_đoán_đã_lưu('vé mục tiêu')
+tải_ngày_dự_đoán_đã_lưu('dự đoán')
 
 // đối chiếu các vé đã lưu với kết quả thật của kỳ ngay sau kỳ cơ sở, nếu kỳ đó đã có trong dữ liệu
 async function đối_chiếu_vé_đã_lưu(loại_nguồn: Loại_Nguồn_Vé) {
@@ -1048,6 +1058,7 @@ async function đối_chiếu_vé_đã_lưu(loại_nguồn: Loại_Nguồn_Vé) 
     'vé phủ': 'bộ vé phủ',
     'danh sách': 'vé từ danh sách xuất hiện',
     'vé mục tiêu': 'vé mục tiêu',
+    'dự đoán': 'vé của tạo dự đoán',
   }[loại_nguồn]
   const tất_cả_bộ = (await đọc_tất_cả_vé_đã_lưu()).filter((bộ) => bộ.loại_nguồn === loại_nguồn)
   if (tất_cả_bộ.length === 0) {
@@ -1057,13 +1068,24 @@ async function đối_chiếu_vé_đã_lưu(loại_nguồn: Loại_Nguồn_Vé) 
 
   // chỉ đối chiếu các bộ của ngày dự đoán đã chọn ('' là tất cả)
   const ngày_chọn = ngày_đã_chọn_theo_nguồn[loại_nguồn].value
-  const các_bộ = ngày_chọn ? tất_cả_bộ.filter((bộ) => bộ.ngày_dự_đoán === ngày_chọn) : tất_cả_bộ
+  const tên_danh_sách_chọn = loại_nguồn === 'dự đoán' ? danh_sách_đối_chiếu_dự_đoán.value : ''
+  const các_bộ = tất_cả_bộ.filter(
+    (bộ) =>
+      (!ngày_chọn || bộ.ngày_dự_đoán === ngày_chọn) &&
+      (!tên_danh_sách_chọn || bộ.tên_danh_sách === tên_danh_sách_chọn),
+  )
   if (các_bộ.length === 0) {
-    console.log(`Không có ${tên_loại_vé} nào cho ngày dự đoán ${ngày_chọn}`)
+    console.log(
+      `Không có ${tên_loại_vé} nào cho ngày dự đoán ${ngày_chọn || 'bất kỳ'}${tên_danh_sách_chọn ? `, ${tên_danh_sách_chọn}` : ''}`,
+    )
     return
   }
 
   const định_dạng_tiền = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' })
+  let tổng_vé = 0
+  let tổng_lãi_lỗ = 0
+  const tổng_trúng = { trúng_3: 0, trúng_4: 0, trúng_5: 0, trúng_6: 0 }
+  let số_dòng_đã_có_kết_quả = 0
   const các_dòng = các_bộ.map((bộ) => {
     const danh_sách = bộ.loại_xổ_số === 55 ? dữ_liệu_xổ_số_55 : dữ_liệu_xổ_số_45
     // danh sách xếp mới nhất trước, nên kỳ ngay sau kỳ cơ sở nằm ở vị trí liền trước
@@ -1081,6 +1103,13 @@ async function đối_chiếu_vé_đã_lưu(loại_nguồn: Loại_Nguồn_Vé) 
     const đánh_giá = đánh_giá_bộ_vé(bộ.vé, kỳ_sau)
     const số_vé_theo_mức = (mức: string) =>
       đánh_giá.dòng_theo_mức.find((dòng) => dòng.mức_trúng === mức)?.số_vé ?? 0
+    số_dòng_đã_có_kết_quả++
+    tổng_vé += bộ.vé.length
+    tổng_lãi_lỗ += đánh_giá.lãi_lỗ
+    tổng_trúng.trúng_3 += số_vé_theo_mức('trúng_3')
+    tổng_trúng.trúng_4 += số_vé_theo_mức('trúng_4')
+    tổng_trúng.trúng_5 += số_vé_theo_mức('trúng_5') + số_vé_theo_mức('jackpot_2')
+    tổng_trúng.trúng_6 += số_vé_theo_mức('jackpot_1')
     return {
       ...thông_tin_chung,
       kết_quả: `${kỳ_sau.ngày_xổ_số}: ${kỳ_sau.kết_quả_xổ_số.join(' ')}`,
@@ -1092,8 +1121,15 @@ async function đối_chiếu_vé_đã_lưu(loại_nguồn: Loại_Nguồn_Vé) 
     }
   })
 
-  console.group(`Đối chiếu ${tên_loại_vé} đã lưu (${ngày_chọn || 'tất cả ngày dự đoán'})`)
+  console.group(
+    `Đối chiếu ${tên_loại_vé} đã lưu (${ngày_chọn || 'tất cả ngày dự đoán'}${tên_danh_sách_chọn ? `, ${tên_danh_sách_chọn}` : ''})`,
+  )
   console.table(các_dòng)
+  if (số_dòng_đã_có_kết_quả > 0) {
+    console.log(
+      `tổng ${số_dòng_đã_có_kết_quả} dòng đã có kết quả: ${tổng_vé} vé, trúng 3: ${tổng_trúng.trúng_3}, trúng 4: ${tổng_trúng.trúng_4}, trúng 5: ${tổng_trúng.trúng_5}, trúng 6: ${tổng_trúng.trúng_6}, lãi/lỗ: ${định_dạng_tiền.format(tổng_lãi_lỗ)}`,
+    )
+  }
   console.groupEnd()
 }
 
@@ -1356,7 +1392,25 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
             <div>
               <button @click="tạo_dự_đoán_cho_các_danh_sách(dữ_liệu_xổ_số_55)">tạo dự đoán 55</button>
               <button @click="tạo_dự_đoán_cho_các_danh_sách(dữ_liệu_xổ_số_45)">tạo dự đoán 45</button>
-              cho danh sách chính và các danh sách phụ
+              cho danh sách chính và các danh sách phụ (tự lưu để đánh giá)
+            </div>
+            <div>
+              ngày đánh giá
+              <select v-model="ngày_đối_chiếu_dự_đoán">
+                <option value="">tất cả</option>
+                <option v-for="ngày in các_ngày_dự_đoán_theo_số_lần_đã_lưu" :key="ngày" :value="ngày">
+                  {{ ngày }}
+                </option>
+              </select>
+              danh sách
+              <select v-model="danh_sách_đối_chiếu_dự_đoán">
+                <option value="">tất cả</option>
+                <option v-for="tên in tên_các_danh_sách_của_ngày_đang_chọn" :key="tên" :value="tên">
+                  {{ tên }}
+                </option>
+              </select>
+              <button @click="đối_chiếu_vé_đã_lưu('dự đoán')">đánh giá dự đoán đã lưu</button>
+              <button @click="mở_trang_xem_dự_đoán_đã_lưu">xem dự đoán đã lưu</button>
             </div>
           </div>
         </template>

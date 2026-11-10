@@ -247,3 +247,17 @@ function tổ_hợp_chỉ_số(tổng: number, cỡ: number): number[][] {
   đi(0, [])
   return kết_quả
 }
+
+// số nhóm `số_giống` vị trí khác nhau có trong các bộ đã biết, để biết bộ lọc loại vé giống phủ kín cỡ nào
+export function đếm_nhóm_vị_trí_đã_biết(các_bộ_vị_trí: number[][], số_giống: number): number {
+  if (!Number.isInteger(số_giống) || số_giống < 1 || số_giống > SỐ_VỊ_TRÍ_MỖI_VÉ) return 0
+  const khóa_đã_biết = new Set<number>()
+  các_bộ_vị_trí.forEach((bộ) => {
+    if (bộ.length < số_giống) return
+    const đã_sắp_xếp = [...bộ].sort((a, b) => a - b)
+    tổ_hợp_chỉ_số(bộ.length, số_giống).forEach((tập) =>
+      khóa_đã_biết.add(tập.reduce((khóa, i) => khóa * 128 + đã_sắp_xếp[i], 0)),
+    )
+  })
+  return khóa_đã_biết.size
+}

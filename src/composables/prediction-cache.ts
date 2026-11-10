@@ -52,6 +52,18 @@ export type Vé_Mục_Tiêu_Đã_Lưu = {
   vé: string[][]
 }
 
+// Vé của nút "tạo dự đoán" (danh sách chính và các danh sách phụ), lưu để đánh giá khi có kết quả kỳ sau
+export const TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN = 'dự_đoán_theo_số_lần|'
+
+export type Dự_Đoán_Theo_Số_Lần_Đã_Lưu = {
+  loại_xổ_số: number
+  ngày_cơ_sở: string // ngày kỳ mới nhất trong dữ liệu lúc tạo (DD/MM/YYYY)
+  ngày_dự_đoán: string // ngày kỳ tiếp theo mà các vé dành cho (DD/MM/YYYY)
+  thời_điểm_tạo: number
+  điều_kiện: string // mô tả số lần, lọc... lúc tạo
+  các_danh_sách: Array<{ tên: string; vé: string[][] }> // chỉ gồm danh sách tạo được vé
+}
+
 function mở_cơ_sở_dữ_liệu(): Promise<IDBDatabase> {
   return new Promise((giải_quyết, từ_chối) => {
     const yêu_cầu = indexedDB.open(TÊN_CƠ_SỞ_DỮ_LIỆU, 1)

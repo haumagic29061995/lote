@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
-import LotoView from '../views/LotoView.vue'
+import DuDoanDaLuuView from '../views/DuDoanDaLuuView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -11,9 +11,9 @@ const router = createRouter({
       component: HomeView,
     },
     {
-      path: '/loto',
-      name: 'loto',
-      component: LotoView,
+      path: '/du-doan-da-luu',
+      name: 'du-doan-da-luu',
+      component: DuDoanDaLuuView,
     },
   ],
 })
