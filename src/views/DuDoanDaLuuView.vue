@@ -13,6 +13,7 @@ import {
   liệt_kê_bộ_nhớ_đệm_theo_tiền_tố,
   TIỀN_TỐ_DS_DỰ_ĐOÁN,
   TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN,
+  TIỀN_TỐ_PHÂN_TÍCH_DỰ_ĐOÁN,
   type Dự_Đoán_Đã_Lưu,
   type Dự_Đoán_Theo_Số_Lần_Đã_Lưu,
 } from '@/composables/prediction-cache'
@@ -34,7 +35,9 @@ Promise.all(
   }),
 )
 
-liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN)
+liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(
+  route.query.nguon === 'phân tích' ? TIỀN_TỐ_PHÂN_TÍCH_DỰ_ĐOÁN : TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN,
+)
   .then((kết_quả) => {
     các_bản_ghi.value = kết_quả.map((mục) => mục.giá_trị)
   })
@@ -154,7 +157,7 @@ const các_nhóm_hiển_thị = computed(() =>
 
 <template>
   <div :style="{ padding: '12px' }">
-    <h3>Dự đoán đã lưu</h3>
+    <h3>Dự đoán đã lưu ({{ route.query.nguon === 'phân tích' ? 'phân tích và dự đoán' : 'tạo dự đoán' }})</h3>
     <div>
       ngày dự đoán
       <select v-model="ngày_chọn">

@@ -64,6 +64,9 @@ export type Dự_Đoán_Theo_Số_Lần_Đã_Lưu = {
   các_danh_sách: Array<{ tên: string; vé: string[][] }> // chỉ gồm danh sách tạo được vé
 }
 
+// Vé của nút "phân tích và dự đoán" (từ thống kê dự đoán), cùng dạng bản ghi với "tạo dự đoán" nhưng lưu riêng
+export const TIỀN_TỐ_PHÂN_TÍCH_DỰ_ĐOÁN = 'phân_tích_dự_đoán|'
+
 function mở_cơ_sở_dữ_liệu(): Promise<IDBDatabase> {
   return new Promise((giải_quyết, từ_chối) => {
     const yêu_cầu = indexedDB.open(TÊN_CƠ_SỞ_DỮ_LIỆU, 1)
