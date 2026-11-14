@@ -47,7 +47,7 @@ import {
 } from '@/composables/prediction-cache'
 import { dịch_vụ_indexeddb, type Vị_Trí_Lặp_Lại } from '@/composables/indexeddb-service'
 
-import { Đối_Tượng_Xổ_Số, type Loại_Dữ_Liệu_Xuât_Hiện } from '@/types/lote'
+import { Đối_Tượng_Xổ_Số } from '@/types/lote'
 
 import { lấy_dấu_thời_gian_của_kỳ_sau, tạo_tùy_chọn_để_hiển_thị } from '@/utils'
 import _ from 'lodash'
@@ -105,16 +105,16 @@ const có_hiển_thị_chi_tiết = ref<boolean>(false)
 // bộ lọc bộ vị trí khi xem dự đoán; -1 là không lọc, hai điều kiện đặt cùng lúc thì chỉ cần thỏa một (or)
 const SỐ_VỊ_TRÍ_MỖI_HÀNG = 6
 const lọc_số_trùng_trong_cột = ref<number>(1)
-const lọc_số_cùng_hàng = ref<number>(2)
+const lọc_số_cùng_hàng = ref<number>(3)
 // mỗi cột chứa tối đa ngần này số, áp dụng thêm (và) vào điều kiện cột/hàng ở trên
 const số_tối_đa_mỗi_cột = ref<number>(3)
 // "tạo dự đoán": chỉ dùng các số có số lần xuất hiện trong khoảng này (tối đa 6), tạo tối đa chừng này vé mỗi danh sách
 const SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA = 6
 const số_lần_xuất_hiện_từ = ref<number>(1)
 const số_lần_xuất_hiện_tới = ref<number>(2)
-const số_lượng_vé_dự_đoán = ref<number>(40)
+const số_lượng_vé_dự_đoán = ref<number>(1000)
 // loại vé giống từ ngần này vị trí với một bộ trong thống kê dự đoán (0 là không loại)
-const số_vị_trí_giống_để_loại = ref<number>(4)
+const số_vị_trí_giống_để_loại = ref<number>(5)
 
 // số vị trí nằm trong từng nhóm (cột hoặc hàng) có ít nhất 1 vị trí
 function đếm_vị_trí_mỗi_nhóm(ds_vị_trí: number[], lấy_nhóm: (vị_trí: number) => number): number[] {
@@ -195,7 +195,8 @@ const tên_các_danh_sách_của_ngày_đang_chọn = computed(() => [
   ),
 ])
 watch(tên_các_danh_sách_của_ngày_đang_chọn, (tên_các_danh_sách) => {
-  if (!tên_các_danh_sách.includes(danh_sách_đối_chiếu_dự_đoán.value)) danh_sách_đối_chiếu_dự_đoán.value = ''
+  if (!tên_các_danh_sách.includes(danh_sách_đối_chiếu_dự_đoán.value))
+    danh_sách_đối_chiếu_dự_đoán.value = ''
 })
 
 // các vé của nút phân tích và dự đoán: lưu riêng, có ô chọn ngày và danh sách riêng
@@ -206,12 +207,15 @@ const các_danh_sách_phân_tích_đã_lưu = ref<Array<{ ngày: string; tên: s
 const tên_các_danh_sách_phân_tích_của_ngày_đang_chọn = computed(() => [
   ...new Set(
     các_danh_sách_phân_tích_đã_lưu.value
-      .filter((mục) => !ngày_đối_chiếu_phân_tích.value || mục.ngày === ngày_đối_chiếu_phân_tích.value)
+      .filter(
+        (mục) => !ngày_đối_chiếu_phân_tích.value || mục.ngày === ngày_đối_chiếu_phân_tích.value,
+      )
       .map((mục) => mục.tên),
   ),
 ])
 watch(tên_các_danh_sách_phân_tích_của_ngày_đang_chọn, (tên_các_danh_sách) => {
-  if (!tên_các_danh_sách.includes(danh_sách_đối_chiếu_phân_tích.value)) danh_sách_đối_chiếu_phân_tích.value = ''
+  if (!tên_các_danh_sách.includes(danh_sách_đối_chiếu_phân_tích.value))
+    danh_sách_đối_chiếu_phân_tích.value = ''
 })
 
 const vị_trí_phân_tích = ref<number>(1)
@@ -512,7 +516,9 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
   // (kỳ gần k nhất trước). Vòng lặp dưới đi từ kỳ cũ đến mới nên cần đổi từ chỉ số trong danh sách đang tích lũy.
   const tổng_bộ_trước_kỳ: number[] = [0]
   danh_sách_dữ_liệu.forEach((dữ_liệu) =>
-    tổng_bộ_trước_kỳ.push(tổng_bộ_trước_kỳ[tổng_bộ_trước_kỳ.length - 1] + dữ_liệu.vị_trí_ds_xuất_hiện.length),
+    tổng_bộ_trước_kỳ.push(
+      tổng_bộ_trước_kỳ[tổng_bộ_trước_kỳ.length - 1] + dữ_liệu.vị_trí_ds_xuất_hiện.length,
+    ),
   )
   const nguồn_bộ_vị_trí: Array<{ kỳ: number; thứ_tự: number }> = []
 
@@ -779,7 +785,9 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
   const tới = Number(số_lần_xuất_hiện_tới.value)
   const số_vé = Number(số_lượng_vé_dự_đoán.value)
   if (!(từ >= 1 && từ <= tới && tới <= SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA)) {
-    console.warn(`Số lần xuất hiện phải từ 1 đến ${SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA} và "từ" không lớn hơn "tới"`)
+    console.warn(
+      `Số lần xuất hiện phải từ 1 đến ${SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA} và "từ" không lớn hơn "tới"`,
+    )
     return
   }
   if (!Number.isInteger(số_vé) || số_vé < 1) {
@@ -799,7 +807,9 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
     const đã_lưu = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(lấy_tên_lưu_trữ(danh_sách_dữ_liệu))
     bộ_vị_trí_thống_kê = (đã_lưu[0]?.dữ_liệu ?? []).map((mục) => mục.ds_vị_trí)
     if (bộ_vị_trí_thống_kê.length === 0) {
-      console.warn('Chưa có thống kê dự đoán đã lưu nên không loại được vé nào, hãy bấm "thống kê dự đoán" trước')
+      console.warn(
+        'Chưa có thống kê dự đoán đã lưu nên không loại được vé nào, hãy bấm "thống kê dự đoán" trước',
+      )
     }
   }
   const không_giống_thống_kê = tạo_bộ_lọc_loại_vé_giống(bộ_vị_trí_thống_kê, số_giống)
@@ -838,14 +848,17 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
     // số nhóm vị trí có thể có trong một danh sách (46 số của 55, 40 số của 45) để biết bộ lọc phủ kín cỡ nào
     const số_số_trong_danh_sách = kỳ.loại_xổ_số === 55 ? 46 : 40
     let tổng_nhóm = 1
-    for (let i = 0; i < số_giống; i++) tổng_nhóm = (tổng_nhóm * (số_số_trong_danh_sách - i)) / (i + 1)
+    for (let i = 0; i < số_giống; i++)
+      tổng_nhóm = (tổng_nhóm * (số_số_trong_danh_sách - i)) / (i + 1)
     const nhóm_đã_biết = đếm_nhóm_vị_trí_đã_biết(bộ_vị_trí_thống_kê, số_giống)
     const phần_trăm = (nhóm_đã_biết / tổng_nhóm) * 100
     console.log(
       `thống kê đã chứa ${nhóm_đã_biết}/${Math.round(tổng_nhóm)} nhóm ${số_giống} vị trí (${phần_trăm.toFixed(1)}%)`,
     )
     if (phần_trăm > 80) {
-      console.warn(`Bộ lọc loại gần hết mọi vé, hãy tăng "loại vé giống" lên hoặc đặt 0 để không loại`)
+      console.warn(
+        `Bộ lọc loại gần hết mọi vé, hãy tăng "loại vé giống" lên hoặc đặt 0 để không loại`,
+      )
     }
   }
 
@@ -860,7 +873,9 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
       số_vé,
       (ds_vị_trí) => qua_bộ_lọc_vị_trí(ds_vị_trí) && không_giống_thống_kê(ds_vị_trí),
       tạo_bộ_sinh_ngẫu_nhiên(
-        tạo_seed_từ_chuỗi(`${kỳ.loại_xổ_số}|${kỳ.ngày_xổ_số}|${tên}|${từ}|${tới}|${số_vé}|${số_giống}`),
+        tạo_seed_từ_chuỗi(
+          `${kỳ.loại_xổ_số}|${kỳ.ngày_xổ_số}|${tên}|${từ}|${tới}|${số_vé}|${số_giống}`,
+        ),
       ),
     )
     tổng_vé += vé.length
@@ -874,9 +889,13 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
     console.groupEnd()
   })
   if (tổng_vé === 0) {
-    console.warn('Không danh sách nào tạo được vé, hãy nới điều kiện (số lần xuất hiện, lọc cột/hàng, số vị trí giống)')
+    console.warn(
+      'Không danh sách nào tạo được vé, hãy nới điều kiện (số lần xuất hiện, lọc cột/hàng, số vị trí giống)',
+    )
   }
-  console.log(`tổng ${tổng_vé} vé từ ${các_danh_sách.length} danh sách, đã lưu để đánh giá cho kỳ ${ngày_dự_đoán}`)
+  console.log(
+    `tổng ${tổng_vé} vé từ ${các_danh_sách.length} danh sách, đã lưu để đánh giá cho kỳ ${ngày_dự_đoán}`,
+  )
   console.groupEnd()
 
   // mỗi tổ hợp điều kiện lưu một bản ghi riêng, tạo lại cùng điều kiện thì ghi đè đúng bản đó
@@ -980,7 +999,9 @@ function tạo_và_in_vé_kỳ_tới(danh_sách_dữ_liệu: Array<Đối_Tượ
   console.group(
     `Vé kỳ tới ${loại_xổ_số} (${chiến_lược_vé.value}), dự đoán cho kỳ ${ngày_dự_đoán}, đã lưu để đối chiếu`,
   )
-  console.log(`số vừa ra (kỳ mới nhất ${danh_sách_dữ_liệu[0].ngày_xổ_số}): ${thống_kê.vừa_ra.join(' ')}`)
+  console.log(
+    `số vừa ra (kỳ mới nhất ${danh_sách_dữ_liệu[0].ngày_xổ_số}): ${thống_kê.vừa_ra.join(' ')}`,
+  )
   console.log(
     `số nóng (nhiều nhất trong 50 kỳ gần nhất): ${thống_kê.nóng.map((mục) => `${mục.số} (${mục.lần} lần)`).join(', ')}`,
   )
@@ -1023,13 +1044,14 @@ type Vé_Đã_Lưu_Chung = {
 
 // gộp mọi vé đã lưu (bộ vé phủ và vé từ danh sách xuất hiện), mới tạo nhất trước
 async function đọc_tất_cả_vé_đã_lưu(): Promise<Vé_Đã_Lưu_Chung[]> {
-  const [bộ_vé_phủ, vé_từ_danh_sách, vé_mục_tiêu, dự_đoán_theo_số_lần, phân_tích_dự_đoán] = await Promise.all([
-    liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Bộ_Vé_Phủ_Đã_Lưu>(TIỀN_TỐ_BỘ_VÉ_PHỦ),
-    liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Vé_Từ_Danh_Sách_Đã_Lưu>(TIỀN_TỐ_VÉ_TỪ_DANH_SÁCH),
-    liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Vé_Mục_Tiêu_Đã_Lưu>(TIỀN_TỐ_VÉ_MỤC_TIÊU),
-    liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN),
-    liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(TIỀN_TỐ_PHÂN_TÍCH_DỰ_ĐOÁN),
-  ])
+  const [bộ_vé_phủ, vé_từ_danh_sách, vé_mục_tiêu, dự_đoán_theo_số_lần, phân_tích_dự_đoán] =
+    await Promise.all([
+      liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Bộ_Vé_Phủ_Đã_Lưu>(TIỀN_TỐ_BỘ_VÉ_PHỦ),
+      liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Vé_Từ_Danh_Sách_Đã_Lưu>(TIỀN_TỐ_VÉ_TỪ_DANH_SÁCH),
+      liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Vé_Mục_Tiêu_Đã_Lưu>(TIỀN_TỐ_VÉ_MỤC_TIÊU),
+      liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN),
+      liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(TIỀN_TỐ_PHÂN_TÍCH_DỰ_ĐOÁN),
+    ])
   return [
     ...bộ_vé_phủ.map(({ giá_trị: bộ }) => ({
       loại_nguồn: 'vé phủ' as const,
@@ -1064,7 +1086,10 @@ async function đọc_tất_cả_vé_đã_lưu(): Promise<Vé_Đã_Lưu_Chung[]>
       ...phân_tích_dự_đoán.map((mục) => ({ ...mục, loại_nguồn: 'phân tích' as const })),
     ].flatMap(({ giá_trị: bộ, loại_nguồn }) =>
       // bản không tạo được vé nào vẫn phải có mặt để ngày của nó hiện trong ô chọn ngày
-      (bộ.các_danh_sách?.length ? bộ.các_danh_sách : [{ tên: 'không có danh sách nào tạo được vé', vé: [] }]).map((danh_sách) => ({
+      (bộ.các_danh_sách?.length
+        ? bộ.các_danh_sách
+        : [{ tên: 'không có danh sách nào tạo được vé', vé: [] }]
+      ).map((danh_sách) => ({
         loại_nguồn,
         nguồn: `${danh_sách.tên} (${bộ.điều_kiện})`,
         tên_danh_sách: danh_sách.tên,
@@ -1096,15 +1121,20 @@ const các_ngày_theo_nguồn: Record<Loại_Nguồn_Vé, Ref<string[]>> = {
 
 // đọc các ngày dự đoán đang có trong IndexedDB cho một loại vé (mới nhất trước) để làm danh sách chọn
 async function tải_ngày_dự_đoán_đã_lưu(loại_nguồn: Loại_Nguồn_Vé, ngày_cần_chọn?: string) {
-  const các_bộ_cùng_loại = (await đọc_tất_cả_vé_đã_lưu()).filter((bộ) => bộ.loại_nguồn === loại_nguồn)
+  const các_bộ_cùng_loại = (await đọc_tất_cả_vé_đã_lưu()).filter(
+    (bộ) => bộ.loại_nguồn === loại_nguồn,
+  )
   if (loại_nguồn === 'dự đoán' || loại_nguồn === 'phân tích') {
-    const đích = loại_nguồn === 'dự đoán' ? các_danh_sách_dự_đoán_đã_lưu : các_danh_sách_phân_tích_đã_lưu
+    const đích =
+      loại_nguồn === 'dự đoán' ? các_danh_sách_dự_đoán_đã_lưu : các_danh_sách_phân_tích_đã_lưu
     đích.value = các_bộ_cùng_loại.map((bộ) => ({
       ngày: bộ.ngày_dự_đoán,
       tên: bộ.tên_danh_sách ?? '',
     }))
   }
-  const các_ngày = [...new Set(các_bộ_cùng_loại.map((bộ) => bộ.ngày_dự_đoán))].sort((a, b) => moment(b, 'DD/MM/YYYY').valueOf() - moment(a, 'DD/MM/YYYY').valueOf())
+  const các_ngày = [...new Set(các_bộ_cùng_loại.map((bộ) => bộ.ngày_dự_đoán))].sort(
+    (a, b) => moment(b, 'DD/MM/YYYY').valueOf() - moment(a, 'DD/MM/YYYY').valueOf(),
+  )
   các_ngày_theo_nguồn[loại_nguồn].value = các_ngày
 
   const ngày_đã_chọn = ngày_đã_chọn_theo_nguồn[loại_nguồn]
@@ -1330,7 +1360,9 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
         tổng_số_dự_đoán.add(số_mới)
         return số_mới
       })
-      các_dòng_log.push(`dự đoán kỳ ${dữ_liệu_dự_đoán2.ngày_xổ_số}: ${danh_sách_dự_đoán.join(', ')}`)
+      các_dòng_log.push(
+        `dự đoán kỳ ${dữ_liệu_dự_đoán2.ngày_xổ_số}: ${danh_sách_dự_đoán.join(', ')}`,
+      )
     }
     console.log(các_dòng_log.join('\n'))
   } else {
@@ -1358,7 +1390,9 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
     const số_kỳ_đã_xét = danh_sách_dữ_liệu.length - giá_trị_được_dự_đoán - 1
     console.log(
       `thống kê ${số_kỳ_đã_xét} kỳ: ` +
-        [3, 4, 5, 6].map((mức) => `trúng ${mức} số: ${số_kỳ_theo_số_trùng.get(mức) ?? 0} kỳ`).join(', '),
+        [3, 4, 5, 6]
+          .map((mức) => `trúng ${mức} số: ${số_kỳ_theo_số_trùng.get(mức) ?? 0} kỳ`)
+          .join(', '),
     )
     console.log('các số được dự đoán:', [...số_giống_kết_quả.values()].join(', '))
     console.log(
@@ -1393,268 +1427,293 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
         gap: '4px',
       }"
     >
-      <div v-show="đang_mở_đầu_trang" :style="{ display: 'flex', 'flex-direction': 'row', gap: '12px' }">
-      <div>
-        <div :style="{ display: 'flex', gap: '20px', 'align-items': 'center' }">
+      <div
+        v-show="đang_mở_đầu_trang"
+        :style="{ display: 'flex', 'flex-direction': 'row', gap: '12px' }"
+      >
+        <div>
+          <div :style="{ display: 'flex', gap: '20px', 'align-items': 'center' }">
+            <div>
+              <select v-model="số_dữ_liệu_sẽ_được_hiển_thị">
+                <option
+                  v-for="giá_trị in các_tùy_chọn_để_hiển_thị_dữ_liệu"
+                  :key="giá_trị"
+                  :value="giá_trị"
+                >
+                  {{ giá_trị }}
+                </option>
+              </select>
+            </div>
+          </div>
           <div>
-            <select v-model="số_dữ_liệu_sẽ_được_hiển_thị">
-              <option
-                v-for="giá_trị in các_tùy_chọn_để_hiển_thị_dữ_liệu"
-                :key="giá_trị"
-                :value="giá_trị"
-              >
-                {{ giá_trị }}
-              </option>
-            </select>
+            Hôm nay dự đoán cho:
+            <span :style="{ color: 'greenyellow', fontSize: '18px' }">{{
+              mở_xổ_số_loại_tiếp_theo
+            }}</span>
           </div>
-        </div>
-        <div>
-          Hôm nay dự đoán cho:
-          <span :style="{ color: 'greenyellow', fontSize: '18px' }">{{
-            mở_xổ_số_loại_tiếp_theo
-          }}</span>
-        </div>
-        <div>
-          <div :style="{ display: 'flex', 'align-items': 'center' }">
-            <div :style="{ background: 'red', width: '10px', height: '10px' }"></div>
-            Kết quả dự đoán
-            <input v-model="màu_kết_quả_dự_đoán" type="checkbox" />
-          </div>
-          <div :style="{ display: 'flex', 'align-items': 'center' }">
-            <div :style="{ background: 'blue', width: '10px', height: '10px' }"></div>
-            Kết quả hiện tại
-            <input v-model="màu_kết_quả_hiện_tại" type="checkbox" />
-          </div>
-        </div>
-        <div>
-          <button @click="dự_đoán_bằng_cách_tăng(55)">Dự đoán bằng tăng 55</button>
-          <button @click="dự_đoán_bằng_cách_tăng(45)">Dự đoán bằng tăng 45</button>
-          dự đoán cho:
-          <input v-model="đơn_vị_được_dự_đoán" type="text" :style="{ width: '20px' }" /> đơn vị:
-          <input v-model="đơn_vị" type="text" :style="{ width: '20px' }" />
-        </div>
-        <div>Hiển thị chi tiết: <input v-model="có_hiển_thị_chi_tiết" type="checkbox" /></div>
-        <template v-if="có_hiển_thị_chi_tiết">
-          <div :style="{ color: '#7dd3fc' }">
-            <div>*1* : Tính năng 1 chi tiết</div>
-            <div>
-              - Lọc ít nhất
-              <select v-model="lọc_số_trùng_trong_cột">
-                <option v-for="giá_trị in [-1, 1, 2, 3]" :key="giá_trị" :value="giá_trị">
-                  {{ giá_trị }}
-                </option>
-              </select>
-              cột có từ 2 số trở lên
-            </div>
-            <div>
-              - Lọc mỗi hàng tối đa
-              <select v-model="lọc_số_cùng_hàng">
-                <option v-for="giá_trị in [-1, 2, 3, 4]" :key="giá_trị" :value="giá_trị">
-                  {{ giá_trị }}
-                </option>
-              </select>
-              số (điều kiện or, -1 là không lọc)
-            </div>
-            <div>
-              - Mỗi cột tối đa
-              <select v-model="số_tối_đa_mỗi_cột">
-                <option v-for="giá_trị in [2, 3, 4]" :key="giá_trị" :value="giá_trị">
-                  {{ giá_trị }}
-                </option>
-              </select>
-              số (điều kiện and với các lọc trên)
-            </div>
-            <div>
-              - Tạo dự đoán: số lần xuất hiện từ
-              <select v-model="số_lần_xuất_hiện_từ">
-                <option v-for="giá_trị in SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA" :key="giá_trị" :value="giá_trị">
-                  {{ giá_trị }}
-                </option>
-              </select>
-              tới
-              <select v-model="số_lần_xuất_hiện_tới">
-                <option v-for="giá_trị in SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA" :key="giá_trị" :value="giá_trị">
-                  {{ giá_trị }}
-                </option>
-              </select>
-              , số lượng vé
-              <input v-model="số_lượng_vé_dự_đoán" type="text" :style="{ width: '30px' }" />
-              , loại vé giống
-              <input v-model="số_vị_trí_giống_để_loại" type="text" :style="{ width: '20px' }" />
-              vị trí với thống kê dự đoán (0 là không loại)
-            </div>
-            <div>
-              <button @click="tạo_dự_đoán_cho_các_danh_sách(dữ_liệu_xổ_số_55)">tạo dự đoán 55</button>
-              <button @click="tạo_dự_đoán_cho_các_danh_sách(dữ_liệu_xổ_số_45)">tạo dự đoán 45</button>
-              cho danh sách chính và các danh sách phụ (tự lưu để đánh giá)
-            </div>
-            <div>
-              ngày đánh giá
-              <select v-model="ngày_đối_chiếu_dự_đoán">
-                <option value="">tất cả</option>
-                <option v-for="ngày in các_ngày_dự_đoán_theo_số_lần_đã_lưu" :key="ngày" :value="ngày">
-                  {{ ngày }}
-                </option>
-              </select>
-              danh sách
-              <select v-model="danh_sách_đối_chiếu_dự_đoán">
-                <option value="">tất cả</option>
-                <option v-for="tên in tên_các_danh_sách_của_ngày_đang_chọn" :key="tên" :value="tên">
-                  {{ tên }}
-                </option>
-              </select>
-              <button @click="đối_chiếu_vé_đã_lưu('dự đoán')">đánh giá dự đoán đã lưu</button>
-              <button @click="mở_trang_xem_dự_đoán_đã_lưu('dự đoán')">xem dự đoán đã lưu</button>
-            </div>
-            <div>*1*</div>
-          </div>
-        </template>
-      </div>
-
-      <div>
-        <div>
           <div>
-            <button @click="xóa_hết_bộ_nhớ_đệm">Xoá hết bộ nhớ đệm</button>
-          </div>
-          <div :style="{ color: '#7dd3fc' }">
-            <div>*1* : Tính năng 1 đánh giá</div>
-            <div>
-              <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán 55</button>
-              <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_45)">thống kê dự đoán 45</button>
-              để lưu vào indexed DB
+            <div :style="{ display: 'flex', 'align-items': 'center' }">
+              <div :style="{ background: 'red', width: '10px', height: '10px' }"></div>
+              Kết quả dự đoán
+              <input v-model="màu_kết_quả_dự_đoán" type="checkbox" />
             </div>
-            <div>
-              từ Indexed DB<button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55)">
-                phân tích và dự đoán 55</button
-              ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45)">
-                phân tích và dự đoán 45
-              </button>
-              chỉ mục
-              <input
-                type="text"
-                v-model="vị_trí_phân_tích"
-                placeholder="Nhập vị trí phân tích"
-                :style="{ width: '20px' }"
-              />
-              danh sách dự đoán
-              <input
-                type="text"
-                v-model="vị_trí_dự_đoán"
-                placeholder="Nhập vị trí dự đoán"
-                :style="{ width: '20px' }"
-              />
+            <div :style="{ display: 'flex', 'align-items': 'center' }">
+              <div :style="{ background: 'blue', width: '10px', height: '10px' }"></div>
+              Kết quả hiện tại
+              <input v-model="màu_kết_quả_hiện_tại" type="checkbox" />
+            </div>
+          </div>
+          <div>
+            <button @click="dự_đoán_bằng_cách_tăng(55)">Dự đoán bằng tăng 55</button>
+            <button @click="dự_đoán_bằng_cách_tăng(45)">Dự đoán bằng tăng 45</button>
+            dự đoán cho:
+            <input v-model="đơn_vị_được_dự_đoán" type="text" :style="{ width: '20px' }" /> đơn vị:
+            <input v-model="đơn_vị" type="text" :style="{ width: '20px' }" />
+          </div>
+          <div>Hiển thị chi tiết: <input v-model="có_hiển_thị_chi_tiết" type="checkbox" /></div>
+          <template v-if="có_hiển_thị_chi_tiết">
+            <div :style="{ color: '#7dd3fc' }">
+              <div>*1* : Tính năng 1 chi tiết</div>
               <div>
-                lọc nhóm từng trúng ở danh sách số
-                <input type="text" v-model="danh_sách_dự_đoán" :style="{ width: '20px' }" />
-                (khi chọn chỉ mục = 0, tự lưu để đánh giá)
+                - Lọc ít nhất
+                <select v-model="lọc_số_trùng_trong_cột">
+                  <option v-for="giá_trị in [-1, 1, 2, 3]" :key="giá_trị" :value="giá_trị">
+                    {{ giá_trị }}
+                  </option>
+                </select>
+                cột có từ 2 số trở lên
+              </div>
+              <div>
+                - Lọc mỗi hàng tối đa
+                <select v-model="lọc_số_cùng_hàng">
+                  <option v-for="giá_trị in [-1, 2, 3, 4]" :key="giá_trị" :value="giá_trị">
+                    {{ giá_trị }}
+                  </option>
+                </select>
+                số (điều kiện or, -1 là không lọc)
+              </div>
+              <div>
+                - Mỗi cột tối đa
+                <select v-model="số_tối_đa_mỗi_cột">
+                  <option v-for="giá_trị in [2, 3, 4]" :key="giá_trị" :value="giá_trị">
+                    {{ giá_trị }}
+                  </option>
+                </select>
+                số (điều kiện and với các lọc trên)
+              </div>
+              <div>
+                - Tạo dự đoán: số lần xuất hiện từ
+                <select v-model="số_lần_xuất_hiện_từ">
+                  <option
+                    v-for="giá_trị in SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA"
+                    :key="giá_trị"
+                    :value="giá_trị"
+                  >
+                    {{ giá_trị }}
+                  </option>
+                </select>
+                tới
+                <select v-model="số_lần_xuất_hiện_tới">
+                  <option
+                    v-for="giá_trị in SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA"
+                    :key="giá_trị"
+                    :value="giá_trị"
+                  >
+                    {{ giá_trị }}
+                  </option>
+                </select>
+                , số lượng vé
+                <input v-model="số_lượng_vé_dự_đoán" type="text" :style="{ width: '30px' }" />
+                , loại vé giống
+                <input v-model="số_vị_trí_giống_để_loại" type="text" :style="{ width: '20px' }" />
+                vị trí với thống kê dự đoán (0 là không loại)
+              </div>
+              <div>
+                <button @click="tạo_dự_đoán_cho_các_danh_sách(dữ_liệu_xổ_số_55)">
+                  tạo dự đoán 55
+                </button>
+                <button @click="tạo_dự_đoán_cho_các_danh_sách(dữ_liệu_xổ_số_45)">
+                  tạo dự đoán 45
+                </button>
+                cho danh sách chính và các danh sách phụ (tự lưu để đánh giá)
               </div>
               <div>
                 ngày đánh giá
-                <select v-model="ngày_đối_chiếu_phân_tích">
+                <select v-model="ngày_đối_chiếu_dự_đoán">
                   <option value="">tất cả</option>
-                  <option v-for="ngày in các_ngày_phân_tích_đã_lưu" :key="ngày" :value="ngày">
+                  <option
+                    v-for="ngày in các_ngày_dự_đoán_theo_số_lần_đã_lưu"
+                    :key="ngày"
+                    :value="ngày"
+                  >
                     {{ ngày }}
                   </option>
                 </select>
                 danh sách
-                <select v-model="danh_sách_đối_chiếu_phân_tích">
+                <select v-model="danh_sách_đối_chiếu_dự_đoán">
                   <option value="">tất cả</option>
                   <option
-                    v-for="tên in tên_các_danh_sách_phân_tích_của_ngày_đang_chọn"
+                    v-for="tên in tên_các_danh_sách_của_ngày_đang_chọn"
                     :key="tên"
                     :value="tên"
                   >
                     {{ tên }}
                   </option>
                 </select>
-                <button @click="đối_chiếu_vé_đã_lưu('phân tích')">đánh giá dự đoán đã lưu</button>
-                <button @click="mở_trang_xem_dự_đoán_đã_lưu('phân tích')">xem dự đoán đã lưu</button>
+                <button @click="đối_chiếu_vé_đã_lưu('dự đoán')">đánh giá dự đoán đã lưu</button>
+                <button @click="mở_trang_xem_dự_đoán_đã_lưu('dự đoán')">xem dự đoán đã lưu</button>
               </div>
+              <div>*1*</div>
             </div>
-            <div>*1*</div>
+          </template>
+        </div>
+
+        <div>
+          <div>
+            <div>
+              <button @click="xóa_hết_bộ_nhớ_đệm">Xoá hết bộ nhớ đệm</button>
+            </div>
+            <div :style="{ color: '#7dd3fc' }">
+              <div>*1* : Tính năng 1 đánh giá</div>
+              <div>
+                <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán 55</button>
+                <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_45)">thống kê dự đoán 45</button>
+                để lưu vào indexed DB
+              </div>
+              <div>
+                từ Indexed DB<button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55)">
+                  phân tích và dự đoán 55</button
+                ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45)">
+                  phân tích và dự đoán 45
+                </button>
+                chỉ mục
+                <input
+                  type="text"
+                  v-model="vị_trí_phân_tích"
+                  placeholder="Nhập vị trí phân tích"
+                  :style="{ width: '20px' }"
+                />
+                danh sách dự đoán
+                <input
+                  type="text"
+                  v-model="vị_trí_dự_đoán"
+                  placeholder="Nhập vị trí dự đoán"
+                  :style="{ width: '20px' }"
+                />
+                <div>
+                  lọc nhóm từng trúng ở danh sách số
+                  <input type="text" v-model="danh_sách_dự_đoán" :style="{ width: '20px' }" />
+                  (khi chọn chỉ mục = 0, tự lưu để đánh giá)
+                </div>
+                <div>
+                  ngày đánh giá
+                  <select v-model="ngày_đối_chiếu_phân_tích">
+                    <option value="">tất cả</option>
+                    <option v-for="ngày in các_ngày_phân_tích_đã_lưu" :key="ngày" :value="ngày">
+                      {{ ngày }}
+                    </option>
+                  </select>
+                  danh sách
+                  <select v-model="danh_sách_đối_chiếu_phân_tích">
+                    <option value="">tất cả</option>
+                    <option
+                      v-for="tên in tên_các_danh_sách_phân_tích_của_ngày_đang_chọn"
+                      :key="tên"
+                      :value="tên"
+                    >
+                      {{ tên }}
+                    </option>
+                  </select>
+                  <button @click="đối_chiếu_vé_đã_lưu('phân tích')">đánh giá dự đoán đã lưu</button>
+                  <button @click="mở_trang_xem_dự_đoán_đã_lưu('phân tích')">
+                    xem dự đoán đã lưu
+                  </button>
+                </div>
+              </div>
+              <div>*1*</div>
+            </div>
+          </div>
+          <div :style="{ color: '#fcd34d' }">
+            <div>*2* : Tính năng 2 số lần xuất hiện</div>
+            Số Xuất hiện nhiều lần: vị trí dự đoán:
+            <input v-model="vị_trí_xem_số_lần_xuất_hiện" type="text" :style="{ width: '20px' }" />
+            bao nhiêu lần:
+            <input v-model="số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
+            từ vị trí:
+            <input
+              v-model="từ_vị_trí_số_xuất_hiện_nhiều_lần"
+              type="text"
+              :style="{ width: '20px' }"
+            />
+            xem bao nhiêu:
+            <input v-model="chu_kỳ_số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
+            <button @click="lọc_dữ_liệu_theo_số_lần_xuất_hiện()">Lọc</button>
+            <div>*2*</div>
+          </div>
+          <div :style="{ color: '#86efac' }">
+            <div>*3* : Tính năng 3 bộ vé phủ</div>
+            Bộ vé phủ: kỳ
+            <input v-model="vị_trí_kỳ_bộ_vé_phủ" type="text" :style="{ width: '30px' }" />
+            nhóm
+            <input v-model="kích_thước_nhóm_số" type="text" :style="{ width: '20px' }" />
+            số, đảm bảo trúng
+            <input v-model="mức_đảm_bảo_trúng" type="text" :style="{ width: '20px' }" />
+            số, số vé
+            <input v-model="số_vé_bộ_vé_phủ" type="text" :style="{ width: '30px' }" />
+            <button @click="tạo_và_in_bộ_vé(55)">tạo vé 55</button>
+            <button @click="tạo_và_in_bộ_vé(45)">tạo vé 45</button>
+            ngày dự đoán
+            <select v-model="ngày_dự_đoán_đối_chiếu">
+              <option value="">tất cả</option>
+              <option v-for="ngày in các_ngày_dự_đoán_đã_lưu" :key="ngày" :value="ngày">
+                {{ ngày }}
+              </option>
+            </select>
+            <button @click="đối_chiếu_vé_đã_lưu('vé phủ')">đối chiếu vé đã lưu</button>
+            <div>*3*</div>
+          </div>
+          <div :style="{ color: '#f9a8d4' }">
+            <div>*4* : Tính năng 4 vé mục tiêu</div>
+            Vé mục tiêu (55: {{ SỐ_VÉ_MỤC_TIÊU[55] }}, 45: {{ SỐ_VÉ_MỤC_TIÊU[45] }}) chiến lược
+            <select v-model="chiến_lược_vé">
+              <option v-for="tên in Object.keys(CÁC_CHIẾN_LƯỢC)" :key="tên" :value="tên">
+                {{ tên }}
+              </option>
+            </select>
+            <button @click="tạo_và_in_vé_kỳ_tới(dữ_liệu_xổ_số_55)">vé kỳ tới 55</button>
+            <button @click="tạo_và_in_vé_kỳ_tới(dữ_liệu_xổ_số_45)">vé kỳ tới 45</button>
+            ngày đối chiếu
+            <select v-model="ngày_đối_chiếu_vé_mục_tiêu">
+              <option value="">tất cả</option>
+              <option v-for="ngày in các_ngày_vé_mục_tiêu_đã_lưu" :key="ngày" :value="ngày">
+                {{ ngày }}
+              </option>
+            </select>
+            <button @click="đối_chiếu_vé_đã_lưu('vé mục tiêu')">đối chiếu vé đã lưu</button>
+            <div>*4*</div>
+          </div>
+          <div :style="{ color: '#c4b5fd' }">
+            <div>*5* : Tính năng 5 vé từ danh sách</div>
+            Vé từ danh sách xuất hiện (công thức cố định, ít nhất 1 cột 2 số, mỗi hàng tối đa 3 số):
+            kỳ
+            <input v-model="vị_trí_kỳ_tạo_vé" type="text" :style="{ width: '30px' }" />
+            danh sách
+            <input v-model="chỉ_số_ds_tạo_vé" type="text" :style="{ width: '20px' }" />
+            số vé
+            <input v-model="số_vé_từ_danh_sách" type="text" :style="{ width: '40px' }" />
+            <button @click="tạo_và_in_vé_từ_danh_sách(dữ_liệu_xổ_số_55)">tạo 55</button>
+            <button @click="tạo_và_in_vé_từ_danh_sách(dữ_liệu_xổ_số_45)">tạo 45</button>
+            ngày đối chiếu
+            <select v-model="ngày_đối_chiếu_vé_danh_sách">
+              <option value="">tất cả</option>
+              <option v-for="ngày in các_ngày_vé_danh_sách_đã_lưu" :key="ngày" :value="ngày">
+                {{ ngày }}
+              </option>
+            </select>
+            <button @click="đối_chiếu_vé_đã_lưu('danh sách')">đối chiếu vé đã lưu</button>
+            <div>*5*</div>
           </div>
         </div>
-        <div :style="{ color: '#fcd34d' }">
-          <div>*2* : Tính năng 2 số lần xuất hiện</div>
-          Số Xuất hiện nhiều lần: vị trí dự đoán:
-          <input v-model="vị_trí_xem_số_lần_xuất_hiện" type="text" :style="{ width: '20px' }" />
-          bao nhiêu lần:
-          <input v-model="số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
-          từ vị trí:
-          <input
-            v-model="từ_vị_trí_số_xuất_hiện_nhiều_lần"
-            type="text"
-            :style="{ width: '20px' }"
-          />
-          xem bao nhiêu:
-          <input v-model="chu_kỳ_số_xuất_hiện_nhiều_lần" type="text" :style="{ width: '20px' }" />
-          <button @click="lọc_dữ_liệu_theo_số_lần_xuất_hiện()">Lọc</button>
-          <div>*2*</div>
-        </div>
-        <div :style="{ color: '#86efac' }">
-          <div>*3* : Tính năng 3 bộ vé phủ</div>
-          Bộ vé phủ: kỳ
-          <input v-model="vị_trí_kỳ_bộ_vé_phủ" type="text" :style="{ width: '30px' }" />
-          nhóm
-          <input v-model="kích_thước_nhóm_số" type="text" :style="{ width: '20px' }" />
-          số, đảm bảo trúng
-          <input v-model="mức_đảm_bảo_trúng" type="text" :style="{ width: '20px' }" />
-          số, số vé
-          <input v-model="số_vé_bộ_vé_phủ" type="text" :style="{ width: '30px' }" />
-          <button @click="tạo_và_in_bộ_vé(55)">tạo vé 55</button>
-          <button @click="tạo_và_in_bộ_vé(45)">tạo vé 45</button>
-          ngày dự đoán
-          <select v-model="ngày_dự_đoán_đối_chiếu">
-            <option value="">tất cả</option>
-            <option v-for="ngày in các_ngày_dự_đoán_đã_lưu" :key="ngày" :value="ngày">
-              {{ ngày }}
-            </option>
-          </select>
-          <button @click="đối_chiếu_vé_đã_lưu('vé phủ')">đối chiếu vé đã lưu</button>
-          <div>*3*</div>
-        </div>
-        <div :style="{ color: '#f9a8d4' }">
-          <div>*4* : Tính năng 4 vé mục tiêu</div>
-          Vé mục tiêu (55: {{ SỐ_VÉ_MỤC_TIÊU[55] }}, 45: {{ SỐ_VÉ_MỤC_TIÊU[45] }}) chiến lược
-          <select v-model="chiến_lược_vé">
-            <option v-for="tên in Object.keys(CÁC_CHIẾN_LƯỢC)" :key="tên" :value="tên">
-              {{ tên }}
-            </option>
-          </select>
-          <button @click="tạo_và_in_vé_kỳ_tới(dữ_liệu_xổ_số_55)">vé kỳ tới 55</button>
-          <button @click="tạo_và_in_vé_kỳ_tới(dữ_liệu_xổ_số_45)">vé kỳ tới 45</button>
-          ngày đối chiếu
-          <select v-model="ngày_đối_chiếu_vé_mục_tiêu">
-            <option value="">tất cả</option>
-            <option v-for="ngày in các_ngày_vé_mục_tiêu_đã_lưu" :key="ngày" :value="ngày">
-              {{ ngày }}
-            </option>
-          </select>
-          <button @click="đối_chiếu_vé_đã_lưu('vé mục tiêu')">đối chiếu vé đã lưu</button>
-          <div>*4*</div>
-        </div>
-        <div :style="{ color: '#c4b5fd' }">
-          <div>*5* : Tính năng 5 vé từ danh sách</div>
-          Vé từ danh sách xuất hiện (công thức cố định, ít nhất 1 cột 2 số, mỗi hàng tối đa 3 số):
-          kỳ
-          <input v-model="vị_trí_kỳ_tạo_vé" type="text" :style="{ width: '30px' }" />
-          danh sách
-          <input v-model="chỉ_số_ds_tạo_vé" type="text" :style="{ width: '20px' }" />
-          số vé
-          <input v-model="số_vé_từ_danh_sách" type="text" :style="{ width: '40px' }" />
-          <button @click="tạo_và_in_vé_từ_danh_sách(dữ_liệu_xổ_số_55)">tạo 55</button>
-          <button @click="tạo_và_in_vé_từ_danh_sách(dữ_liệu_xổ_số_45)">tạo 45</button>
-          ngày đối chiếu
-          <select v-model="ngày_đối_chiếu_vé_danh_sách">
-            <option value="">tất cả</option>
-            <option v-for="ngày in các_ngày_vé_danh_sách_đã_lưu" :key="ngày" :value="ngày">
-              {{ ngày }}
-            </option>
-          </select>
-          <button @click="đối_chiếu_vé_đã_lưu('danh sách')">đối chiếu vé đã lưu</button>
-          <div>*5*</div>
-        </div>
-      </div>
       </div>
       <div :style="{ textAlign: 'center' }">
         <button
