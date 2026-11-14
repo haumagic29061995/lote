@@ -1,5 +1,5 @@
 // Nguồn dữ liệu kết quả xổ số: Google Sheet xuất bản dạng CSV (Publish to web, tự xuất bản lại khi sửa sheet).
-// Nếu không tải được thì app dùng file CSV có sẵn trong src/assets/csv làm dự phòng.
+// Không có dữ liệu dự phòng: nếu không tải được thì app báo lỗi và cho tải lại.
 export const LINK_CSV_LOTE_45 =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTuQHHFRzAmMC_tHRnu8cCrr1k2eofH6e3cyk2_YqFfNmREGfR6cSyuIQJnr7OulqrBHF9wMueqpCsY/pub?gid=1819524273&single=true&output=csv'
 

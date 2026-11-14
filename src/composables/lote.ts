@@ -1,21 +1,18 @@
 import moment from 'moment'
 
-import csv_dữ_liệu_55 from '@/assets/csv/lote55.csv?raw'
-import csv_dữ_liệu_45 from '@/assets/csv/lote45.csv?raw'
-
 import { LINK_CSV_LOTE_45, LINK_CSV_LOTE_55 } from '@/constants/lote'
 import { tải_csv_từ_link } from '@/composables/data-source'
 import { Đối_Tượng_Xổ_Số, type Loại_Dữ_Liệu_Xuât_Hiện } from '@/types/lote'
 
 import { lấy_dấu_thời_gian_của_các_kỳ_tiếp_theo } from '@/utils'
 
-// nội dung CSV đang dùng: mặc định là file có sẵn trong dự án, được thay bằng dữ liệu Google Sheet nếu tải được
-let csv_45_hiện_tại: string = csv_dữ_liệu_45
-let csv_55_hiện_tại: string = csv_dữ_liệu_55
+// nội dung CSV đang dùng, được thay bằng dữ liệu Google Sheet khi nạp thành công
+let csv_45_hiện_tại: string = ''
+let csv_55_hiện_tại: string = ''
 
 /**
  * Tải dữ liệu mới nhất từ Google Sheet, gọi một lần trước khi app khởi động.
- * Lỗi (mất mạng, link sai, dữ liệu không hợp lệ) thì giữ file CSV có sẵn và báo ở console, không làm app dừng.
+ * Không còn file CSV dự phòng: lỗi (mất mạng, link sai, dữ liệu không hợp lệ) thì ném Error để nơi gọi báo cho người dùng.
  */
 export async function nạp_dữ_liệu_từ_google_sheet(): Promise<void> {
   const nguồn = [
@@ -33,9 +30,7 @@ export async function nạp_dữ_liệu_từ_google_sheet(): Promise<void> {
         )
         dữ_liệu.cảnh_báo.forEach((cảnh_báo) => console.warn(`dữ liệu ${tên}: ${cảnh_báo}`))
       } catch (lỗi) {
-        console.warn(
-          `dữ liệu ${tên}: không tải được từ Google Sheet (${(lỗi as Error).message}), dùng file CSV có sẵn trong dự án (có thể cũ)`,
-        )
+        throw new Error(`không tải được dữ liệu ${tên} từ Google Sheet: ${(lỗi as Error).message}`)
       }
     }),
   )
