@@ -99,6 +99,59 @@ export function đọc_danh_sách_loto(csv: string): Dòng_Loto[] {
   return kết_quả.sort((a, b) => b.thời_điểm - a.thời_điểm)
 }
 
+export type Lần_Xuất_Hiện = {
+  ngày: string
+  thời_điểm: number
+  kết_quả: Kết_Quả_Loto
+  cách_lần_trước: number | null // số ngày kể từ lần trước có cùng số, null nếu là lần đầu
+}
+
+export type Nhóm_Số = {
+  số: string
+  các_lần: Lần_Xuất_Hiện[] // mới nhất trước
+  số_có: number
+  số_không: number
+  tỉ_lệ_có: number // % trên các lần đã có kết quả, 0 nếu chưa có lần nào
+}
+
+const MILI_GIÂY_MỖI_NGÀY = 86400000
+
+/** Gom các ngày có cùng số dự đoán để so sánh: kết quả từng lần và số ngày cách lần trước. Xếp theo số tăng dần. */
+export function nhóm_theo_số(các_dòng: Dòng_Loto[]): Nhóm_Số[] {
+  const theo_số = new Map<string, Dòng_Loto[]>()
+  for (const dòng of các_dòng) {
+    const nhóm = theo_số.get(dòng.số)
+    if (nhóm) nhóm.push(dòng)
+    else theo_số.set(dòng.số, [dòng])
+  }
+
+  return [...theo_số.entries()]
+    .map(([số, dòng_cùng_số]) => {
+      const cũ_đến_mới = [...dòng_cùng_số].sort((a, b) => a.thời_điểm - b.thời_điểm)
+      const các_lần: Lần_Xuất_Hiện[] = cũ_đến_mới
+        .map((dòng, vị_trí) => ({
+          ngày: dòng.ngày,
+          thời_điểm: dòng.thời_điểm,
+          kết_quả: dòng.kết_quả,
+          cách_lần_trước:
+            vị_trí === 0
+              ? null
+              : Math.round((dòng.thời_điểm - cũ_đến_mới[vị_trí - 1].thời_điểm) / MILI_GIÂY_MỖI_NGÀY),
+        }))
+        .reverse()
+      const số_có = các_lần.filter((lần) => lần.kết_quả === 'có').length
+      const số_không = các_lần.filter((lần) => lần.kết_quả === 'không').length
+      return {
+        số,
+        các_lần,
+        số_có,
+        số_không,
+        tỉ_lệ_có: số_có + số_không === 0 ? 0 : (số_có / (số_có + số_không)) * 100,
+      }
+    })
+    .sort((a, b) => a.số.localeCompare(b.số))
+}
+
 const chờ = (mili_giây: number) => new Promise((giải_quyết) => setTimeout(giải_quyết, mili_giây))
 
 /** Tải danh sách loto từ link Google Sheet, thử lại khi lỗi mạng. */
