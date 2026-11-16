@@ -6,7 +6,7 @@ export const LINK_CSV_LOTE_45 =
 export const LINK_CSV_LOTE_55 =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vQvXzBIgByEQchrAuLnQJsBrzcm1V64WMbQvDURph3nk7eMz13T26APw3jo466Ijt4m9Gg4q6zgT3bx/pub?gid=974883964&single=true&output=csv'
 
-// Danh sách loto (ngày, số, kết quả có/không) do Apps Script ghi vào Google Sheet, hiển thị ở trang /loto.
-// Link Publish to web dạng CSV của Google Sheet.
-export const LINK_GOOGLE_SHEET_LOTO =
-  'https://docs.google.com/spreadsheets/d/e/2PACX-1vS22O-AhO6JObxE84rRkY4axpRWLrdtY7-saZa5dRBs94GmOfkt07G5DZ4d-YUdmSiIYWl9RCjLJM9w/pub?gid=0&single=true&output=csv'
+// Kết quả XSMN (Tỉnh | Ngày | 18 số) do Apps Script ghi vào Google Sheet. Link không có gid nên trả về sheet đầu tiên.
+// Khi có nhiều năm (mỗi năm 1 sheet) thì thêm &gid=<gid sheet năm> vào link.
+export const LINK_CSV_XSMN =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSKJmxPPwbuVU8u8sGZp-Q7Mt5LX5yprCZIaT8LGom1NyuWIm5j2NjOnr6KZbj-9nRQKAPcDFkTeR8a/pub?output=csv'
