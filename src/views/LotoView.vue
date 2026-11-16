@@ -9,10 +9,14 @@ const đang_tải = ref(true)
 const lỗi = ref('')
 const lọc = ref<'' | 'có' | 'không'>('')
 const chế_độ = ref<'ngày' | 'số'>('ngày')
+const năm_lọc = ref('') // '' = tất cả các năm
 
 onMounted(async () => {
   try {
     các_dòng.value = await tải_danh_sách_loto(LINK_GOOGLE_SHEET_LOTO)
+    const năm_hiện_tại = String(new Date().getFullYear())
+    // mặc định năm hiện tại; nếu sheet chưa có dữ liệu năm này thì lấy năm mới nhất có dữ liệu
+    năm_lọc.value = các_năm.value.includes(năm_hiện_tại) ? năm_hiện_tại : (các_năm.value[0] ?? '')
   } catch (e) {
     lỗi.value = `không tải được: ${(e as Error).message}`
   } finally {
@@ -26,10 +30,26 @@ const tỉ_lệ_có = computed(() => {
   const tổng = số_có.value + số_không.value
   return tổng === 0 ? 0 : (số_có.value / tổng) * 100
 })
-const các_dòng_hiển_thị = computed(() =>
-  lọc.value ? các_dòng.value.filter((dòng) => dòng.kết_quả === lọc.value) : các_dòng.value,
+const lấy_năm = (ngày: string) => ngày.slice(-4) // ngày dạng DD/MM/YYYY
+const các_năm = computed(() =>
+  [...new Set(các_dòng.value.map((dòng) => lấy_năm(dòng.ngày)))].sort().reverse(),
 )
-const các_nhóm_số = computed(() => nhóm_theo_số(các_dòng.value))
+const các_dòng_theo_năm = computed(() =>
+  năm_lọc.value
+    ? các_dòng.value.filter((dòng) => lấy_năm(dòng.ngày) === năm_lọc.value)
+    : các_dòng.value,
+)
+const các_dòng_hiển_thị = computed(() =>
+  lọc.value
+    ? các_dòng_theo_năm.value.filter((dòng) => dòng.kết_quả === lọc.value)
+    : các_dòng_theo_năm.value,
+)
+// số nào xuất hiện gần đây nhất đứng đầu (các_lần đã xếp mới nhất trước)
+const các_nhóm_số = computed(() =>
+  nhóm_theo_số(các_dòng_theo_năm.value).sort(
+    (a, b) => b.các_lần[0].thời_điểm - a.các_lần[0].thời_điểm,
+  ),
+)
 
 const màu_kết_quả = (kết_quả: string) =>
   kết_quả === 'có' ? '#16a34a' : kết_quả === 'không' ? '#dc2626' : 'inherit'
@@ -57,6 +77,11 @@ const ký_hiệu_kết_quả = (kết_quả: string) =>
           <option value="ngày">ngày</option>
           <option value="số">số (so sánh các lần cùng số)</option>
         </select>
+        , năm
+        <select v-model="năm_lọc">
+          <option value="">tất cả</option>
+          <option v-for="năm in các_năm" :key="năm" :value="năm">{{ năm }}</option>
+        </select>
         <template v-if="chế_độ === 'ngày'">
           , hiển thị
           <select v-model="lọc">
@@ -66,7 +91,7 @@ const ký_hiệu_kết_quả = (kết_quả: string) =>
           </select>
           ({{ các_dòng_hiển_thị.length }} dòng)
         </template>
-        <template v-else>({{ các_nhóm_số.length }} số)</template>
+        <template v-else>({{ các_nhóm_số.length }} số, xếp theo ngày gần nhất)</template>
       </div>
 
       <table
