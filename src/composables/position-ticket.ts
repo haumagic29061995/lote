@@ -6,7 +6,7 @@ import {
   xác_suất_ngẫu_nhiên,
   type Mức_Trúng,
 } from '@/composables/backtest'
-import { tạo_bộ_sinh_ngẫu_nhiên } from '@/composables/ticket-portfolio'
+import { tạo_bộ_sinh_ngẫu_nhiên } from '@/composables/random'
 import type { Đối_Tượng_Xổ_Số } from '@/types/lote'
 
 const SỐ_VỊ_TRÍ_MỖI_VÉ = 6

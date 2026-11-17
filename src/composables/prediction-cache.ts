@@ -14,20 +14,6 @@ export type Dự_Đoán_Đã_Lưu = {
   vị_trí_ds_xuất_hiện: number[][][]
 }
 
-// Bộ vé phủ đã tạo, lưu để sau này đối chiếu với kết quả thật khi có
-export const TIỀN_TỐ_BỘ_VÉ_PHỦ = 'bộ_vé_phủ|'
-
-export type Bộ_Vé_Phủ_Đã_Lưu = {
-  loại_xổ_số: number
-  ngày_cơ_sở: string // ngày kỳ mới nhất trong dữ liệu lúc tạo (DD/MM/YYYY), cũng là seed
-  ngày_dự_đoán: string // ngày kỳ tiếp theo mà bộ vé dành cho (DD/MM/YYYY)
-  thời_điểm_tạo: number
-  nhóm_số: number[]
-  mức_đảm_bảo: number
-  số_vé_tối_thiểu: number
-  vé: number[][]
-}
-
 // Vé tạo từ danh sách xuất hiện của kỳ mới nhất (công thức cố định), lưu để đối chiếu sau
 export const TIỀN_TỐ_VÉ_TỪ_DANH_SÁCH = 'vé_từ_danh_sách|'
 
@@ -37,18 +23,6 @@ export type Vé_Từ_Danh_Sách_Đã_Lưu = {
   ngày_dự_đoán: string // ngày kỳ tiếp theo mà bộ vé dành cho (DD/MM/YYYY)
   thời_điểm_tạo: number
   chỉ_số_danh_sách: number
-  vé: string[][]
-}
-
-// Vé mục tiêu (vé kỳ tới theo chiến lược), lưu để đối chiếu sau
-export const TIỀN_TỐ_VÉ_MỤC_TIÊU = 'vé_mục_tiêu|'
-
-export type Vé_Mục_Tiêu_Đã_Lưu = {
-  loại_xổ_số: number
-  ngày_cơ_sở: string // ngày kỳ mới nhất trong dữ liệu lúc tạo (DD/MM/YYYY), cũng là seed
-  ngày_dự_đoán: string // ngày kỳ tiếp theo mà bộ vé dành cho (DD/MM/YYYY)
-  thời_điểm_tạo: number
-  chiến_lược: string
   vé: string[][]
 }
 
