@@ -108,8 +108,8 @@ type Dòng_Dự_Đoán = {
   thời_điểm: number
   số_đài: number // 3 đài, thứ 7 là 4 đài
   số: string // (thứ tự ngày trong năm) % 100
-  hiệu: string // abs(số - tháng) % 100
-  tổng: string // (số + tháng) % 100
+  hiệu: string // abs(số - tháng - ngày) % 100
+  tổng: string // (số + tháng + ngày) % 100
   có_số: boolean | null // null = chưa có kết quả
   có_hiệu: boolean | null
   có_tổng: boolean | null
@@ -138,11 +138,11 @@ const các_dòng_dự_đoán = computed(() => {
     nhóm?: { số_đài: number; các_số: Map<string, number> },
   ): Dòng_Dự_Đoán => {
     const thời_điểm = đổi_ngày_thành_số(ngày)
-    const [, tháng, năm] = ngày.split('/').map(Number)
+    const [ngày_trong_tháng, tháng, năm] = ngày.split('/').map(Number)
     const thứ_tự_trong_năm = Math.round((thời_điểm - Date.UTC(năm, 0, 1)) / MILI_GIÂY_MỖI_NGÀY) + 1
     const số = thứ_tự_trong_năm % 100
-    const hiệu = Math.abs(số - tháng) % 100
-    const tổng = (số + tháng) % 100
+    const hiệu = Math.abs(số - tháng - ngày_trong_tháng) % 100
+    const tổng = (số + tháng + ngày_trong_tháng) % 100
     const số_lô = (n: number) => nhóm?.các_số.get(hai_chữ_số(n)) ?? 0
     const kiểm_tra = (n: number) => (nhóm ? số_lô(n) > 0 : null)
     return {
@@ -177,9 +177,14 @@ const các_dòng_dự_đoán = computed(() => {
 // Chia năm thành 4 giai đoạn theo thứ tự ngày; 100 ngày liên tiếp thì (thứ tự % 100) đi qua đủ 100 số 00-99
 const NHÃN_GIAI_ĐOẠN = ['Ngày 1–100', 'Ngày 101–200', 'Ngày 201–300', 'Ngày 301 đến hết năm']
 
-// Tiền tính bằng nghìn đồng: mua 1 số ở 1 đài hết 15k, mỗi lô trúng thưởng 80k
-const GIÁ_MỖI_ĐÀI = 15
-const TIỀN_THƯỞNG_MỖI_LÔ = 80
+// Tiền tính bằng nghìn đồng. Loại giá trị: mua 1 số ở 1 đài hết bao nhiêu, mỗi lô trúng thưởng bao nhiêu
+const CÁC_LOẠI_GIÁ = {
+  '1': { giá_mỗi_đài: 15, tiền_thưởng_mỗi_lô: 80 },
+  '2': { giá_mỗi_đài: 18, tiền_thưởng_mỗi_lô: 70 },
+} as const
+const loại_giá = ref<keyof typeof CÁC_LOẠI_GIÁ>('1')
+const GIÁ_MỖI_ĐÀI = computed(() => CÁC_LOẠI_GIÁ[loại_giá.value].giá_mỗi_đài)
+const TIỀN_THƯỞNG_MỖI_LÔ = computed(() => CÁC_LOẠI_GIÁ[loại_giá.value].tiền_thưởng_mỗi_lô)
 
 type Thống_Kê_Giai_Đoạn = {
   nhãn: string
@@ -244,8 +249,9 @@ const thống_kê_dự_đoán = computed<Thống_Kê_Giai_Đoạn[]>(() => {
   )
   return [...các_nhóm, cả_năm]
 })
-const vốn = (nhóm: Thống_Kê_Giai_Đoạn) => nhóm.số_đài_ngày * GIÁ_MỖI_ĐÀI
-const lời_lỗ = (nhóm: Thống_Kê_Giai_Đoạn, số_lô: number) => số_lô * TIỀN_THƯỞNG_MỖI_LÔ - vốn(nhóm)
+const vốn = (nhóm: Thống_Kê_Giai_Đoạn) => nhóm.số_đài_ngày * GIÁ_MỖI_ĐÀI.value
+const lời_lỗ = (nhóm: Thống_Kê_Giai_Đoạn, số_lô: number) =>
+  số_lô * TIỀN_THƯỞNG_MỖI_LÔ.value - vốn(nhóm)
 const hiện_tiền = (nghìn: number) => `${nghìn > 0 ? '+' : ''}${nghìn.toLocaleString('vi-VN')}k`
 const màu_tiền = (nghìn: number) => (nghìn > 0 ? '#16a34a' : nghìn < 0 ? '#dc2626' : 'inherit')
 
@@ -319,17 +325,17 @@ const các_lượt_quay_lại = computed<Lượt_Quay_Lại[]>(() => {
 })
 
 const tiền_lượt = (lượt: Lượt_Quay_Lại) =>
-  lượt.lô * TIỀN_THƯỞNG_MỖI_LÔ - lượt.số_đài_kế * GIÁ_MỖI_ĐÀI
+  lượt.lô * TIỀN_THƯỞNG_MỖI_LÔ.value - lượt.số_đài_kế * GIÁ_MỖI_ĐÀI.value
 const thống_kê_quay_lại = computed(() => {
   const đã_có = các_lượt_quay_lại.value.filter((lượt) => lượt.có !== null)
   const lô = đã_có.reduce((tổng, lượt) => tổng + lượt.lô, 0)
-  const vốn_tổng = đã_có.reduce((tổng, lượt) => tổng + lượt.số_đài_kế * GIÁ_MỖI_ĐÀI, 0)
+  const vốn_tổng = đã_có.reduce((tổng, lượt) => tổng + lượt.số_đài_kế * GIÁ_MỖI_ĐÀI.value, 0)
   return {
     số_lượt: đã_có.length,
     số_có: đã_có.filter((lượt) => lượt.có).length,
     lô,
     vốn: vốn_tổng,
-    lời_lỗ: lô * TIỀN_THƯỞNG_MỖI_LÔ - vốn_tổng,
+    lời_lỗ: lô * TIỀN_THƯỞNG_MỖI_LÔ.value - vốn_tổng,
   }
 })
 
@@ -382,6 +388,11 @@ onMounted(async () => {
         <select v-model="năm_lọc">
           <option value="">tất cả</option>
           <option v-for="năm in các_năm" :key="năm" :value="năm">{{ năm }}</option>
+        </select>
+        , loại giá trị
+        <select v-model="loại_giá">
+          <option value="1">1: 15k/đài, trúng 1 lô 80k</option>
+          <option value="2">2: 18k/đài, trúng 1 lô 70k</option>
         </select>
       </div>
 
@@ -438,7 +449,7 @@ onMounted(async () => {
 
       <template v-else-if="lựa_chọn === 'dự_đoán_ngày'">
         <div :style="{ marginTop: '6px' }">
-          Số = (thứ tự ngày trong năm) % 100. Hiệu = |số − tháng| % 100, Tổng = (số + tháng) % 100.
+          Số = (thứ tự ngày trong năm) % 100. Hiệu = |số − tháng − ngày| % 100, Tổng = (số + tháng + ngày) % 100.
           Có = số đó ra ở bất kỳ đài nào trong ngày (3 đài, thứ 7 là 4 đài).
         </div>
         <table
@@ -529,11 +540,11 @@ onMounted(async () => {
               <th :style="{ textAlign: 'center', padding: '2px 8px 2px 14px' }">Số</th>
               <th :style="{ textAlign: 'left', padding: '2px 14px 2px 0' }">Có/không</th>
               <th :style="{ textAlign: 'center', padding: '2px 8px 2px 14px' }">
-                |Số − tháng| % 100
+                |Số − tháng − ngày| % 100
               </th>
               <th :style="{ textAlign: 'left', padding: '2px 14px 2px 0' }">Có/không</th>
               <th :style="{ textAlign: 'center', padding: '2px 8px 2px 14px' }">
-                (Số + tháng) % 100
+                (Số + tháng + ngày) % 100
               </th>
               <th :style="{ textAlign: 'left', padding: '2px 0 2px 0' }">Có/không</th>
             </tr>
