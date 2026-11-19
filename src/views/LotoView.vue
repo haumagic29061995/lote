@@ -349,19 +349,33 @@ type Dòng_Năm_Trước = {
   ngày: string
   thời_điểm: number
   ngày_năm_trước: string // cùng ngày/tháng của năm trước
-  các_số: { số: string; lô_trước: number; có: boolean }[] // các số đã ra ngày đó năm trước; có = hôm nay cũng ra
+  các_số: { số: string; lô_trước: number; có: boolean; lô_nay: number }[] // các số đã ra ngày đó năm trước; có = hôm nay cũng ra
   số_trùng: number
+  vốn: number // nghìn đồng: mua tất cả các số trên ở mọi đài của ngày
+  lời_lỗ: number | null // null = ngày hiện tại chưa có kết quả
   chưa_có_kết_quả: boolean // ngày hiện tại chưa có kết quả: hiện 0/N và các số năm trước (không tô xanh/đỏ)
 }
 
 // So từng ngày với cùng ngày/tháng của năm trước: những số đã ra hôm đó năm trước, năm nay có ra lại không.
 // Chỉ có dòng khi dữ liệu có cả hai năm (29/02 không có ngày tương ứng thì bỏ qua).
+// So sánh theo 2 hoặc 3 số cuối của giải (3 số cuối bỏ qua giải 8 chỉ có 2 chữ số)
+const số_chữ_số_so_sánh = ref<2 | 3>(2)
+// Tiền tính bằng nghìn đồng, mua 1 số ở 1 đài: 2 số vốn 20k trúng 1 lô 80k; 3 số vốn 20k trúng 1 lô 600k
+const GIÁ_SO_SÁNH = {
+  2: { giá_mỗi_đài: 20, tiền_thưởng_mỗi_lô: 80 },
+  3: { giá_mỗi_đài: 20, tiền_thưởng_mỗi_lô: 600 },
+} as const
 const các_dòng_năm_trước = computed<Dòng_Năm_Trước[]>(() => {
+  const độ_dài = số_chữ_số_so_sánh.value
+  const giá = GIÁ_SO_SÁNH[độ_dài]
   const theo_ngày = new Map<string, Map<string, number>>() // ngày DD/MM/YYYY -> (số -> số lô)
+  const số_đài_theo_ngày = new Map<string, number>() // ngày -> số đài (3, thứ 7 là 4)
   for (const hàng of tất_cả_hàng.value) {
+    số_đài_theo_ngày.set(hàng[1], (số_đài_theo_ngày.get(hàng[1]) ?? 0) + 1)
     const đếm = theo_ngày.get(hàng[1]) ?? new Map<string, number>()
     for (const giải of hàng[2].split(/\s+/).filter(Boolean)) {
-      const số = giải.slice(-2).padStart(2, '0')
+      if (giải.length < độ_dài) continue
+      const số = giải.slice(-độ_dài)
       đếm.set(số, (đếm.get(số) ?? 0) + 1)
     }
     theo_ngày.set(hàng[1], đếm)
@@ -375,13 +389,22 @@ const các_dòng_năm_trước = computed<Dòng_Năm_Trước[]>(() => {
     if (!năm_trước) continue
     const các_số = [...năm_trước.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([số, lô_trước]) => ({ số, lô_trước, có: hôm_nay.has(số) }))
+      .map(([số, lô_trước]) => ({
+        số,
+        lô_trước,
+        có: hôm_nay.has(số),
+        lô_nay: hôm_nay.get(số) ?? 0,
+      }))
+    const vốn = các_số.length * (số_đài_theo_ngày.get(ngày) ?? 0) * giá.giá_mỗi_đài
+    const thưởng = các_số.reduce((tổng, mục) => tổng + mục.lô_nay, 0) * giá.tiền_thưởng_mỗi_lô
     kết_quả.push({
       ngày,
       thời_điểm: đổi_ngày_thành_số(ngày),
       ngày_năm_trước,
       các_số,
       số_trùng: các_số.filter((mục) => mục.có).length,
+      vốn,
+      lời_lỗ: thưởng - vốn,
       chưa_có_kết_quả: false,
     })
   }
@@ -402,8 +425,10 @@ const các_dòng_năm_trước = computed<Dòng_Năm_Trước[]>(() => {
         ngày_năm_trước,
         các_số: [...năm_trước.entries()]
           .sort((a, b) => a[0].localeCompare(b[0]))
-          .map(([số, lô_trước]) => ({ số, lô_trước, có: false })),
+          .map(([số, lô_trước]) => ({ số, lô_trước, có: false, lô_nay: 0 })),
         số_trùng: 0,
+        vốn: 0,
+        lời_lỗ: null,
         chưa_có_kết_quả: true,
       })
     }
@@ -419,6 +444,8 @@ const thống_kê_năm_trước = computed(() => {
     số_ngày: các_dòng.length,
     tổng_số,
     số_trùng,
+    vốn: các_dòng.reduce((tổng, dòng) => tổng + dòng.vốn, 0),
+    lời_lỗ: các_dòng.reduce((tổng, dòng) => tổng + (dòng.lời_lỗ ?? 0), 0),
     tỉ_lệ: tổng_số ? (số_trùng / tổng_số) * 100 : 0,
   }
 })
@@ -781,6 +808,14 @@ onMounted(async () => {
       </template>
 
       <template v-else-if="lựa_chọn === 'năm_trước'">
+        <div :style="{ marginTop: '6px' }">
+          so sánh
+          <select v-model.number="số_chữ_số_so_sánh">
+            <option :value="2">2 số cuối (20k/đài, trúng 1 lô 80k)</option>
+            <option :value="3">3 số cuối (20k/đài, trúng 1 lô 600k)</option>
+          </select>
+          của các giải; lời/lỗ = mua tất cả các số năm trước ở mọi đài của ngày
+        </div>
         <div v-if="các_dòng_năm_trước.length === 0" :style="{ marginTop: '6px' }">
           Chưa có dữ liệu năm trước để so sánh (cần tab năm
           {{ năm_lọc ? Number(năm_lọc) - 1 : 'trước' }} trong dữ liệu).
@@ -793,6 +828,10 @@ onMounted(async () => {
           <div :style="{ marginTop: '4px' }">
             {{ thống_kê_năm_trước.số_ngày }} ngày — {{ thống_kê_năm_trước.số_trùng }} /
             {{ thống_kê_năm_trước.tổng_số }} số ra lại ({{ thống_kê_năm_trước.tỉ_lệ.toFixed(1) }}%)
+            — vốn {{ thống_kê_năm_trước.vốn.toLocaleString('vi-VN') }}k — lời/lỗ:
+            <b :style="{ color: màu_tiền(thống_kê_năm_trước.lời_lỗ) }">{{
+              hiện_tiền(thống_kê_năm_trước.lời_lỗ)
+            }}</b>
           </div>
           <div :style="{ overflowX: 'auto', marginTop: '8px' }">
             <table
@@ -805,6 +844,7 @@ onMounted(async () => {
               <thead>
                 <tr>
                   <th :style="{ textAlign: 'left', padding: '2px 14px 2px 0' }">Ngày</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ</th>
                   <th :style="{ textAlign: 'left', padding: '2px 14px' }">Cùng ngày năm trước</th>
                   <th :style="{ textAlign: 'right', padding: '2px 14px' }">Ra lại</th>
                   <th :style="{ textAlign: 'left', padding: '2px 0 2px 14px' }">
@@ -816,6 +856,17 @@ onMounted(async () => {
                 <tr v-for="dòng in các_dòng_năm_trước" :key="dòng.ngày">
                   <td :style="{ padding: '2px 14px 2px 0', verticalAlign: 'top' }">
                     {{ dòng.ngày }}<template v-if="dòng.chưa_có_kết_quả"> (hôm nay)</template>
+                  </td>
+                  <td
+                    :style="{
+                      textAlign: 'right',
+                      padding: '2px 14px',
+                      verticalAlign: 'top',
+                      fontWeight: 'bold',
+                      color: dòng.lời_lỗ === null ? 'inherit' : màu_tiền(dòng.lời_lỗ),
+                    }"
+                  >
+                    {{ dòng.lời_lỗ === null ? '—' : hiện_tiền(dòng.lời_lỗ) }}
                   </td>
                   <td :style="{ padding: '2px 14px', verticalAlign: 'top' }">
                     {{ dòng.ngày_năm_trước }}
