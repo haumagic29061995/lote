@@ -94,7 +94,7 @@ const có_hiển_thị_chi_tiết = ref<boolean>(false)
 const SỐ_VỊ_TRÍ_MỖI_HÀNG = 6
 const lọc_số_trùng_trong_cột = ref<number>(1)
 const lọc_số_cùng_hàng = ref<number>(3)
-// mỗi cột chứa tối đa ngần này số, áp dụng thêm (và) vào điều kiện cột/hàng ở trên
+// mỗi cột chứa tối đa ngần này số, áp dụng thêm (và) vào điều kiện cột/hàng ở trên; -1 là không lọc
 const số_tối_đa_mỗi_cột = ref<number>(3)
 // "tạo dự đoán": chỉ dùng các số có số lần xuất hiện trong khoảng này (tối đa 6), tạo tối đa chừng này vé mỗi danh sách
 const SỐ_LẦN_XUẤT_HIỆN_TỐI_ĐA = 6
@@ -121,7 +121,7 @@ function qua_bộ_lọc_vị_trí(ds_vị_trí: number[]): boolean {
 
   const đếm_theo_cột = đếm_vị_trí_mỗi_nhóm(ds_vị_trí, (vị_trí) => vị_trí % SỐ_VỊ_TRÍ_MỖI_HÀNG)
   // giới hạn mỗi cột là điều kiện "và", không nằm trong điều kiện "hoặc" giữa cột và hàng
-  if (Math.max(...đếm_theo_cột) > tối_đa_mỗi_cột) return false
+  if (tối_đa_mỗi_cột !== -1 && Math.max(...đếm_theo_cột) > tối_đa_mỗi_cột) return false
   if (số_trùng_cột === -1 && số_cùng_hàng === -1) return true
 
   const đếm_theo_hàng = đếm_vị_trí_mỗi_nhóm(ds_vị_trí, (vị_trí) =>
@@ -1279,11 +1279,11 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
               <div>
                 - Mỗi cột tối đa
                 <select v-model="số_tối_đa_mỗi_cột">
-                  <option v-for="giá_trị in [2, 3, 4]" :key="giá_trị" :value="giá_trị">
+                  <option v-for="giá_trị in [-1, 2, 3, 4]" :key="giá_trị" :value="giá_trị">
                     {{ giá_trị }}
                   </option>
                 </select>
-                số (điều kiện and với các lọc trên)
+                số (điều kiện and với các lọc trên, -1 là không lọc)
               </div>
               <div>
                 - Tạo dự đoán: số lần xuất hiện từ
