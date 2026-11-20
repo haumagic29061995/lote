@@ -198,6 +198,10 @@ watch(tên_các_danh_sách_phân_tích_của_ngày_đang_chọn, (tên_các_danh
 const vị_trí_phân_tích = ref<number>(1)
 const vị_trí_dự_đoán = ref<number>(2)
 const danh_sách_dự_đoán = ref<number>(0)
+const xuất_hiện_lọc = ref<number>(1)
+// lùi về kỳ thứ mấy để tạo dự đoán ở quá khứ (0 = kỳ mới nhất, dự đoán cho kỳ tiếp theo)
+const độ_lệch_kỳ = ref<number>(0)
+const danh_sách_theo_xuất_hiện = ref<number>(2)
 
 
 const danh_sách_dữ_liệu_hiển_thị_45 = ref<Array<Đối_Tượng_Xổ_Số>>()
@@ -591,7 +595,8 @@ async function thống_kê_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tư�
   console.log('kết quả thống kê dự đoán: ', kết_quả)
 }
 
-async function phân_tích_và_dự_đoán(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
+// đọc thống kê vị trí đã lưu trong IndexedDB và gộp các nhóm có cùng ds_vị_trí
+async function đọc_và_nhóm_vị_trí(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
   await dịch_vụ_indexeddb.khởi_tạo()
   const dữ_liệu_lưu_trữ = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(
     lấy_tên_lưu_trữ(danh_sách_dữ_liệu),
@@ -619,7 +624,17 @@ async function phân_tích_và_dự_đoán(danh_sách_dữ_liệu: Array<Đối_
       })
     }
   })
+  return { dữ_liệu, dữ_liệu_nhóm }
+}
 
+// tạo_dự_đoán = true: chỉ tạo dự đoán, luôn dùng chỉ mục 0 (kỳ mới nhất), không phụ thuộc ô chỉ mục, và lưu để đánh giá
+// tạo_dự_đoán = false: chỉ phân tích theo ô chỉ mục
+async function phân_tích_và_dự_đoán(
+  danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>,
+  tạo_dự_đoán = false,
+) {
+  const chỉ_mục_phân_tích = tạo_dự_đoán ? 0 : Number(vị_trí_phân_tích.value)
+  const { dữ_liệu, dữ_liệu_nhóm } = await đọc_và_nhóm_vị_trí(danh_sách_dữ_liệu)
   const kết_quả = _.orderBy(
     dữ_liệu_nhóm,
     [(item: Vị_Trí_Lặp_Lại) => Math.min(...item.xuất_hiện), (item: Vị_Trí_Lặp_Lại) => item.trùng],
@@ -637,11 +652,11 @@ async function phân_tích_và_dự_đoán(danh_sách_dữ_liệu: Array<Đối_
   console.log('sau khi nhóm: ', dữ_liệu_nhóm.length)
   console.log('sau khi nhóm: ', kết_quả)
   console.groupEnd()
-  const dữ_liệu2: Đối_Tượng_Xổ_Số = danh_sách_dữ_liệu[Number(vị_trí_phân_tích.value)]
+  const dữ_liệu2: Đối_Tượng_Xổ_Số = danh_sách_dữ_liệu[chỉ_mục_phân_tích]
   const dự_đoán_ds_xuất_hiện = dữ_liệu2.dự_đoán_ds_xuất_hiện
   const ds_đầu_tiên = dự_đoán_ds_xuất_hiện[Number(vị_trí_dự_đoán.value)] || []
   let tổng_dự_đoán = 0
-  if (Number(vị_trí_phân_tích.value) === 0) {
+  if (tạo_dự_đoán) {
     // dự đoán
     console.group('dự đoán')
     const tất_cả_dự_đoán: string[][] = []
@@ -720,6 +735,67 @@ async function phân_tích_và_dự_đoán(danh_sách_dữ_liệu: Array<Đối_
     console.log('tổng số dự đoán :', tổng_dự_đoán)
     console.groupEnd()
   }
+}
+
+// tạo dự đoán theo "xuất hiện": lấy các nhóm vị trí có `xuất_hiện` chứa index nhập vào,
+// ánh xạ ds_vị_trí vào danh sách phụ (mặc định 2) của kỳ cơ sở (index 0 = kỳ mới nhất), rồi lưu để đánh giá.
+// Khi lùi về kỳ cơ sở thứ `độ_lệch_kỳ` (quá khứ): `xuất_hiện` trong thống kê tính từ kỳ mới nhất nên index
+// nhập vào (tính từ kỳ cơ sở) phải cộng độ lệch; các kỳ trúng ở index này đều cũ hơn kỳ cơ sở nên không nhìn trước tương lai.
+async function tạo_dự_đoán_theo_xuất_hiện(danh_sách_dữ_liệu: Array<Đối_Tượng_Xổ_Số>) {
+  const { dữ_liệu_nhóm } = await đọc_và_nhóm_vị_trí(danh_sách_dữ_liệu)
+  const độ_lệch = Number(độ_lệch_kỳ.value)
+  if (!Number.isInteger(độ_lệch) || độ_lệch < 0 || độ_lệch >= danh_sách_dữ_liệu.length) {
+    console.warn(`Độ lệch kỳ không hợp lệ: ${độ_lệch_kỳ.value}`)
+    return
+  }
+  const kỳ_mới_nhất = danh_sách_dữ_liệu[độ_lệch] // kỳ cơ sở
+  const chỉ_số_nhập = Number(xuất_hiện_lọc.value)
+  const chỉ_số_xuất_hiện = chỉ_số_nhập + độ_lệch // index tuyệt đối trong thống kê
+  const chỉ_số_danh_sách = Number(danh_sách_theo_xuất_hiện.value)
+  const ds_nguồn = kỳ_mới_nhất.dự_đoán_ds_xuất_hiện[chỉ_số_danh_sách] || []
+  if (ds_nguồn.length === 0) {
+    console.warn(`Không có danh sách phụ ${chỉ_số_danh_sách} ở kỳ mới nhất`)
+    return
+  }
+  const vé_đã_gặp = new Set<string>()
+  const vé_lưu: string[][] = []
+  dữ_liệu_nhóm.forEach((item) => {
+    if (!item.xuất_hiện.includes(chỉ_số_xuất_hiện)) return
+    const vé = item.ds_vị_trí.map((vị_trí) => ds_nguồn[vị_trí])
+    if (vé.length === 0 || vé.some((số) => số === undefined)) return
+    const đã_sắp_xếp = [...vé].sort()
+    const khóa = đã_sắp_xếp.join(',')
+    if (vé_đã_gặp.has(khóa)) return
+    vé_đã_gặp.add(khóa)
+    vé_lưu.push(đã_sắp_xếp)
+  })
+  if (vé_lưu.length === 0) {
+    console.warn(`Không có nhóm nào có xuất hiện ${chỉ_số_nhập} (index thống kê ${chỉ_số_xuất_hiện}) để tạo vé`)
+    return
+  }
+  // độ lệch 0: chỉ dự đoán cho kỳ tiếp theo, không tạo dự đoán cho ngày đã qua; độ lệch > 0: dự đoán quá khứ có chủ ý
+  const ngày_dự_đoán = lấy_ngày_dự_đoán(kỳ_mới_nhất)
+  if (độ_lệch === 0 && moment(ngày_dự_đoán, 'DD/MM/YYYY').isBefore(moment().startOf('day'))) {
+    console.warn(
+      `Kỳ ${ngày_dự_đoán} đã qua (dữ liệu mới nhất chỉ đến ${kỳ_mới_nhất.ngày_xổ_số}), không tạo dự đoán cho quá khứ. Hãy cập nhật dữ liệu mới.`,
+    )
+    return
+  }
+  const điều_kiện = độ_lệch === 0 ? `xuất hiện ${chỉ_số_nhập}` : `xuất hiện ${chỉ_số_nhập}, lùi ${độ_lệch} kỳ`
+  const tên = `danh sách phụ ${chỉ_số_danh_sách}`
+  await ghi_bộ_nhớ_đệm<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(
+    `${TIỀN_TỐ_PHÂN_TÍCH_DỰ_ĐOÁN}${kỳ_mới_nhất.loại_xổ_số}|${ngày_dự_đoán}|${điều_kiện}|${tên}`,
+    {
+      loại_xổ_số: kỳ_mới_nhất.loại_xổ_số,
+      ngày_cơ_sở: kỳ_mới_nhất.ngày_xổ_số,
+      ngày_dự_đoán,
+      thời_điểm_tạo: Date.now(),
+      điều_kiện,
+      các_danh_sách: [{ tên, vé: vé_lưu }],
+    },
+  )
+  await tải_ngày_dự_đoán_đã_lưu('phân tích', ngày_dự_đoán)
+  console.log(`đã lưu ${vé_lưu.length} vé (${điều_kiện}, ${tên}) để đánh giá cho kỳ ${ngày_dự_đoán}`)
 }
 
 // ngày kỳ mà vé dự đoán: kỳ cũ lấy ngày thật của kỳ ngay sau nó, kỳ mới nhất thì tính theo lịch quay
@@ -1358,7 +1434,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
               <button @click="xóa_hết_bộ_nhớ_đệm">Xoá hết bộ nhớ đệm</button>
             </div>
             <div :style="{ color: '#7dd3fc' }">
-              <div>*1* : Tính năng 1 đánh giá</div>
+              <div>*1* : Tính năng 1 đánh giá: tạo dự đoán 55/45 theo đại diện</div>
               <div>
                 <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_55)">thống kê dự đoán 55</button>
                 <button @click="thống_kê_dự_đoán(dữ_liệu_xổ_số_45)">thống kê dự đoán 45</button>
@@ -1366,9 +1442,9 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
               </div>
               <div>
                 từ Indexed DB<button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55)">
-                  phân tích và dự đoán 55</button
+                  phân tích 55</button
                 ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45)">
-                  phân tích và dự đoán 45
+                  phân tích 45
                 </button>
                 chỉ mục
                 <input
@@ -1384,10 +1460,29 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
                   placeholder="Nhập vị trí dự đoán"
                   :style="{ width: '20px' }"
                 />
+                <div>1. tạo dự đoán bằng cách danh sách</div>
                 <div>
+                  <button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_55, true)">
+                    tạo dự đoán 55</button
+                  ><button @click="phân_tích_và_dự_đoán(dữ_liệu_xổ_số_45, true)">
+                    tạo dự đoán 45</button
+                  >
                   lọc nhóm từng trúng ở danh sách số
                   <input type="text" v-model="danh_sách_dự_đoán" :style="{ width: '20px' }" />
-                  (khi chọn chỉ mục = 0, tự lưu để đánh giá)
+                </div>
+                <div>2. tạo dự đoán bằng xuất hiện</div>
+                <div>
+                  <button @click="tạo_dự_đoán_theo_xuất_hiện(dữ_liệu_xổ_số_55)">
+                    tạo dự đoán 55</button
+                  ><button @click="tạo_dự_đoán_theo_xuất_hiện(dữ_liệu_xổ_số_45)">
+                    tạo dự đoán 45</button
+                  >
+                  xuất hiện (index)
+                  <input type="text" v-model="xuất_hiện_lọc" :style="{ width: '20px' }" />
+                  danh sách dự đoán của index 0
+                  <input type="text" v-model="danh_sách_theo_xuất_hiện" :style="{ width: '20px' }" />
+                  lùi về kỳ (offset, 0 = kỳ tiếp theo)
+                  <input type="text" v-model="độ_lệch_kỳ" :style="{ width: '20px' }" />
                 </div>
                 <div>
                   ngày đánh giá

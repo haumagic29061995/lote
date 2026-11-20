@@ -125,6 +125,11 @@ function dựng_lưới(
   return { lưới }
 }
 
+// điều kiện dạng "xuất hiện N" (tạo ở nút tạo dự đoán theo xuất hiện), trả về N
+function lấy_xuất_hiện(bản: Dự_Đoán_Theo_Số_Lần_Đã_Lưu): string | undefined {
+  return /^xuất hiện (\d+)/.exec(bản.điều_kiện)?.[1]
+}
+
 const các_nhóm_hiển_thị = computed(() =>
   các_bản_ghi.value
     .filter((bản) => !ngày_chọn.value || bản.ngày_dự_đoán === ngày_chọn.value)
@@ -184,7 +189,9 @@ const các_nhóm_hiển_thị = computed(() =>
       <div v-else>chưa có kết quả để đối chiếu</div>
 
       <div v-for="danh_sách in nhóm.các_danh_sách" :key="danh_sách.tên" :style="{ marginTop: '8px' }">
-        <b>{{ danh_sách.tên }}</b> ({{ danh_sách.vé.length }} vé)
+        <b>{{ danh_sách.tên }}</b>
+        <b v-if="lấy_xuất_hiện(nhóm.bản)"> - xuất hiện {{ lấy_xuất_hiện(nhóm.bản) }}</b>
+        ({{ danh_sách.vé.length }} vé)
         <span v-if="nhóm.kết_quả">
           —
           <span v-for="mục in danh_sách.tổng_theo_mức" :key="mục.mức">

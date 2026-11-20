@@ -16,6 +16,7 @@ type Lựa_Chọn =
   | 'thống_kê_quay_lại'
   | 'năm_trước'
   | 'ngày_hôm_sau'
+  | 'theo_đài'
   | 'dữ_liệu_gốc'
 const lựa_chọn = ref<Lựa_Chọn>('chưa_ra')
 const sắp_xếp = ref<'số' | 'lâu_nhất'>('số')
@@ -450,6 +451,71 @@ const thống_kê_năm_trước = computed(() => {
   }
 })
 
+// Theo từng đài, tách theo thứ trong tuần: những số (2 hoặc 3 số cuối) ra nhiều nhất trong năm đang chọn
+const SỐ_HAY_RA_MỖI_ĐÀI = 10
+const số_chữ_số_theo_đài = ref<2 | 3>(2)
+type Số_Hay_Ra = { số: string; số_lần: number }
+type Đài_Hay_Ra = {
+  đài: string
+  thứ: number // 0 = chủ nhật, 1 = thứ 2 ... 6 = thứ 7
+  số_kỳ: number // số ngày đài này quay vào thứ đó trong năm
+  các_số: Số_Hay_Ra[] // nhiều nhất trước; bằng nhau thì xếp theo số
+}
+// Tên đài bị ghi nhầm trong sheet: (đài, thứ) -> tên đúng. Ví dụ thứ 5 phải là Bình Thuận (BTH) nhưng sheet ghi BT
+// (trùng với Bến Tre quay thứ 3); ngày 09/11/2026 (thứ 2) ghi TH thay vì HCM. Chỉ áp dụng cho lựa chọn 6.
+const SỬA_TÊN_ĐÀI: { đài: string; thứ: number; thành: string }[] = [
+  { đài: 'BT', thứ: 4, thành: 'BTH' },
+  { đài: 'TH', thứ: 1, thành: 'HCM' },
+]
+const các_đài_hay_ra = computed<Đài_Hay_Ra[]>(() => {
+  const độ_dài = số_chữ_số_theo_đài.value
+  const theo_đài_thứ = new Map<
+    string,
+    { đài: string; thứ: number; số_kỳ: number; đếm: Map<string, number> }
+  >()
+  for (const hàng of các_hàng.value) {
+    const thứ = new Date(đổi_ngày_thành_số(hàng[1])).getUTCDay()
+    const đài = SỬA_TÊN_ĐÀI.find((mục) => mục.đài === hàng[0] && mục.thứ === thứ)?.thành ?? hàng[0]
+    const khóa = `${thứ}|${đài}`
+    const nhóm = theo_đài_thứ.get(khóa) ?? { đài, thứ, số_kỳ: 0, đếm: new Map<string, number>() }
+    nhóm.số_kỳ++
+    for (const giải of hàng[2].split(/\s+/).filter(Boolean)) {
+      if (giải.length < độ_dài) continue
+      const số = giải.slice(-độ_dài)
+      nhóm.đếm.set(số, (nhóm.đếm.get(số) ?? 0) + 1)
+    }
+    theo_đài_thứ.set(khóa, nhóm)
+  }
+  return [...theo_đài_thứ.values()]
+    .map((nhóm) => ({
+      đài: nhóm.đài,
+      thứ: nhóm.thứ,
+      số_kỳ: nhóm.số_kỳ,
+      các_số: [...nhóm.đếm.entries()]
+        .map(([số, số_lần]) => ({ số, số_lần }))
+        .sort((a, b) => b.số_lần - a.số_lần || a.số.localeCompare(b.số))
+        .slice(0, SỐ_HAY_RA_MỖI_ĐÀI),
+    }))
+    .sort((a, b) => a.đài.localeCompare(b.đài))
+})
+// Nhóm đài theo thứ trong tuần cho dễ xem: thứ 2 đến thứ 7, cuối cùng chủ nhật.
+// Đài quay 2 thứ (ví dụ HCM) hiện ở cả 2 nhóm, mỗi nhóm chỉ tính các kỳ quay vào thứ đó.
+const THỨ_THEO_TUẦN = [
+  { thứ: 1, nhãn: 'Thứ 2' },
+  { thứ: 2, nhãn: 'Thứ 3' },
+  { thứ: 3, nhãn: 'Thứ 4' },
+  { thứ: 4, nhãn: 'Thứ 5' },
+  { thứ: 5, nhãn: 'Thứ 6' },
+  { thứ: 6, nhãn: 'Thứ 7' },
+  { thứ: 0, nhãn: 'Chủ nhật' },
+]
+const các_đài_theo_thứ = computed(() =>
+  THỨ_THEO_TUẦN.map(({ thứ, nhãn }) => ({
+    nhãn,
+    các_đài: các_đài_hay_ra.value.filter((mục) => mục.thứ === thứ),
+  })).filter((nhóm) => nhóm.các_đài.length > 0),
+)
+
 // Mỗi số từ 00 đến 99: mỗi lần số đó ra, ngày hôm sau có ra nữa không
 const TẤT_CẢ_SỐ = Array.from({ length: 100 }, (_, i) => hai_chữ_số(i))
 // Chỉ xét các lần số đó ra đúng N lô trong ngày (cộng các đài); '' = không lọc, '4+' = từ 4 lô trở lên
@@ -558,6 +624,7 @@ onMounted(async () => {
           <option value="thống_kê_quay_lại">3. Thống kê dự đoán số quay lại (số + 1)</option>
           <option value="năm_trước">4. Phân tích cùng ngày của năm trước</option>
           <option value="ngày_hôm_sau">5. Số lô ra, ngày hôm sau có ra nữa không</option>
+          <option value="theo_đài">6. Theo đài: số hay ra trong năm</option>
           <option value="dữ_liệu_gốc">Dữ liệu gốc</option>
         </select>
         năm
@@ -891,6 +958,59 @@ onMounted(async () => {
             </table>
           </div>
         </template>
+      </template>
+
+      <template v-else-if="lựa_chọn === 'theo_đài'">
+        <div :style="{ marginTop: '6px' }">
+          xem
+          <select v-model.number="số_chữ_số_theo_đài">
+            <option :value="2">2 số cuối</option>
+            <option :value="3">3 số cuối</option>
+          </select>
+          — mỗi đài hiện {{ SỐ_HAY_RA_MỖI_ĐÀI }} số ra nhiều nhất
+          {{ năm_lọc ? `trong năm ${năm_lọc}` : 'trong tất cả các năm' }}; số (n) = n lô
+        </div>
+        <div v-for="nhóm in các_đài_theo_thứ" :key="nhóm.nhãn" :style="{ marginTop: '10px' }">
+          <b>{{ nhóm.nhãn }}</b>
+          <div :style="{ overflowX: 'auto' }">
+            <table
+              :style="{
+                borderCollapse: 'collapse',
+                fontFamily: 'monospace',
+                fontSize: '14px',
+              }"
+            >
+              <thead>
+                <tr>
+                  <th :style="{ textAlign: 'left', padding: '2px 14px 2px 0' }">Đài</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Số kỳ</th>
+                  <th :style="{ textAlign: 'left', padding: '2px 0 2px 14px' }">Các số hay ra</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="mục in nhóm.các_đài" :key="mục.đài">
+                  <td
+                    :style="{ padding: '2px 14px 2px 0', fontWeight: 'bold', verticalAlign: 'top' }"
+                  >
+                    {{ mục.đài }}
+                  </td>
+                  <td :style="{ textAlign: 'right', padding: '2px 14px', verticalAlign: 'top' }">
+                    {{ mục.số_kỳ }}
+                  </td>
+                  <td :style="{ padding: '2px 0 2px 14px' }">
+                    <span
+                      v-for="mục_số in mục.các_số"
+                      :key="mục_số.số"
+                      :style="{ marginRight: '10px' }"
+                    >
+                      <b>{{ mục_số.số }}</b> ({{ mục_số.số_lần }})
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </template>
 
       <template v-else-if="lựa_chọn === 'ngày_hôm_sau'">
