@@ -18,7 +18,7 @@ type Lựa_Chọn =
   | 'ngày_hôm_sau'
   | 'theo_đài'
   | 'dữ_liệu_gốc'
-const lựa_chọn = ref<Lựa_Chọn>('chưa_ra')
+const lựa_chọn = ref<Lựa_Chọn>('năm_trước')
 const sắp_xếp = ref<'số' | 'lâu_nhất'>('số')
 // Số vừa ra (chưa ra = 0) mà lần ra trước cách ≥ ngưỡng này thì coi là "lâu mới ra" và dự đoán số + 1.
 // Mặc định đặt ở số lớn nhất hiện có (chỉ hiện số quay lại sau lâu nhất); sửa tay được.
@@ -336,16 +336,30 @@ type Dòng_Năm_Trước = {
   ngày_năm_trước: string // cùng ngày/tháng của năm trước
   các_số: { số: string; lô_trước: number; có: boolean; lô_nay: number }[] // các số đã ra ngày đó năm trước; có = hôm nay cũng ra
   số_trùng: number
-  số_từ_2_lô: number // số các số đã ra từ 2 lô năm trước
-  số_từ_2_lô_ra_lại: number // trong đó bao nhiêu số hôm nay ra lại
-  lời_lỗ_từ_2_lô: number | null // chỉ mua các số từ 2 lô năm trước ở mọi đài của ngày; null = chưa có kết quả
-  vốn_từ_2_lô: number
+  số_chỉ_2_lô: number // số các số chỉ ra đúng 2 lô năm trước
+  số_chỉ_2_lô_ra_lại: number // trong đó bao nhiêu số hôm nay ra lại
+  lời_lỗ_chỉ_2_lô: number | null // chỉ mua các số chỉ ra đúng 2 lô năm trước ở mọi đài của ngày; null = chưa có kết quả
+  vốn_chỉ_2_lô: number
   số_từ_3_lô: number
   số_từ_3_lô_ra_lại: number
   lời_lỗ_từ_3_lô: number | null
   vốn_từ_3_lô: number
+  số_chỉ_1_lô: number // số các số chỉ ra đúng 1 lô năm trước
+  số_chỉ_1_lô_ra_lại: number
+  lời_lỗ_chỉ_1_lô: number | null
+  vốn_chỉ_1_lô: number
+  số_từ_4_lô: number
+  số_từ_4_lô_ra_lại: number
+  lời_lỗ_từ_4_lô: number | null
+  vốn_từ_4_lô: number
+  số_từ_5_lô: number
+  số_từ_5_lô_ra_lại: number
+  lời_lỗ_từ_5_lô: number | null
+  vốn_từ_5_lô: number
   vốn: number // nghìn đồng: mua tất cả các số trên ở mọi đài của ngày
   lời_lỗ: number | null // null = ngày hiện tại chưa có kết quả
+  vốn_mỗi_số: number // mua 1 số ở mọi đài của ngày (số đài × giá mỗi đài)
+  thưởng_mỗi_lô: number
   nhãn_xem_trước: string // 'hôm nay' | 'ngày mai' cho dòng xem trước, '' cho dòng đã có kết quả
   chưa_có_kết_quả: boolean // ngày hiện tại chưa có kết quả: hiện 0/N và các số năm trước (không tô xanh/đỏ)
 }
@@ -392,32 +406,61 @@ const các_dòng_năm_trước = computed<Dòng_Năm_Trước[]>(() => {
       }))
     const vốn = các_số.length * (số_đài_theo_ngày.get(ngày) ?? 0) * giá.giá_mỗi_đài
     const thưởng = các_số.reduce((tổng, mục) => tổng + mục.lô_nay, 0) * giá.tiền_thưởng_mỗi_lô
-    const các_số_từ_2_lô = các_số.filter((mục) => mục.lô_trước >= 2)
-    const vốn_từ_2_lô =
-      các_số_từ_2_lô.length * (số_đài_theo_ngày.get(ngày) ?? 0) * giá.giá_mỗi_đài
-    const thưởng_từ_2_lô =
-      các_số_từ_2_lô.reduce((tổng, mục) => tổng + mục.lô_nay, 0) * giá.tiền_thưởng_mỗi_lô
+    const các_số_chỉ_1_lô = các_số.filter((mục) => mục.lô_trước === 1)
+    const vốn_chỉ_1_lô =
+      các_số_chỉ_1_lô.length * (số_đài_theo_ngày.get(ngày) ?? 0) * giá.giá_mỗi_đài
+    const thưởng_chỉ_1_lô =
+      các_số_chỉ_1_lô.reduce((tổng, mục) => tổng + mục.lô_nay, 0) * giá.tiền_thưởng_mỗi_lô
+    const các_số_chỉ_2_lô = các_số.filter((mục) => mục.lô_trước === 2)
+    const vốn_chỉ_2_lô =
+      các_số_chỉ_2_lô.length * (số_đài_theo_ngày.get(ngày) ?? 0) * giá.giá_mỗi_đài
+    const thưởng_chỉ_2_lô =
+      các_số_chỉ_2_lô.reduce((tổng, mục) => tổng + mục.lô_nay, 0) * giá.tiền_thưởng_mỗi_lô
     const các_số_từ_3_lô = các_số.filter((mục) => mục.lô_trước >= 3)
     const vốn_từ_3_lô =
       các_số_từ_3_lô.length * (số_đài_theo_ngày.get(ngày) ?? 0) * giá.giá_mỗi_đài
     const thưởng_từ_3_lô =
       các_số_từ_3_lô.reduce((tổng, mục) => tổng + mục.lô_nay, 0) * giá.tiền_thưởng_mỗi_lô
+    const các_số_từ_4_lô = các_số.filter((mục) => mục.lô_trước >= 4)
+    const vốn_từ_4_lô =
+      các_số_từ_4_lô.length * (số_đài_theo_ngày.get(ngày) ?? 0) * giá.giá_mỗi_đài
+    const thưởng_từ_4_lô =
+      các_số_từ_4_lô.reduce((tổng, mục) => tổng + mục.lô_nay, 0) * giá.tiền_thưởng_mỗi_lô
+    const các_số_từ_5_lô = các_số.filter((mục) => mục.lô_trước >= 5)
+    const vốn_từ_5_lô =
+      các_số_từ_5_lô.length * (số_đài_theo_ngày.get(ngày) ?? 0) * giá.giá_mỗi_đài
+    const thưởng_từ_5_lô =
+      các_số_từ_5_lô.reduce((tổng, mục) => tổng + mục.lô_nay, 0) * giá.tiền_thưởng_mỗi_lô
     kết_quả.push({
       ngày,
       thời_điểm: đổi_ngày_thành_số(ngày),
       ngày_năm_trước,
       các_số,
       số_trùng: các_số.filter((mục) => mục.có).length,
-      số_từ_2_lô: các_số.filter((mục) => mục.lô_trước >= 2).length,
-      số_từ_2_lô_ra_lại: các_số.filter((mục) => mục.lô_trước >= 2 && mục.có).length,
-      lời_lỗ_từ_2_lô: thưởng_từ_2_lô - vốn_từ_2_lô,
-      vốn_từ_2_lô,
+      số_chỉ_1_lô: các_số_chỉ_1_lô.length,
+      số_chỉ_1_lô_ra_lại: các_số_chỉ_1_lô.filter((mục) => mục.có).length,
+      lời_lỗ_chỉ_1_lô: thưởng_chỉ_1_lô - vốn_chỉ_1_lô,
+      vốn_chỉ_1_lô,
+      số_chỉ_2_lô: các_số.filter((mục) => mục.lô_trước === 2).length,
+      số_chỉ_2_lô_ra_lại: các_số.filter((mục) => mục.lô_trước === 2 && mục.có).length,
+      lời_lỗ_chỉ_2_lô: thưởng_chỉ_2_lô - vốn_chỉ_2_lô,
+      vốn_chỉ_2_lô,
       số_từ_3_lô: các_số_từ_3_lô.length,
       số_từ_3_lô_ra_lại: các_số_từ_3_lô.filter((mục) => mục.có).length,
       lời_lỗ_từ_3_lô: thưởng_từ_3_lô - vốn_từ_3_lô,
       vốn_từ_3_lô,
+      số_từ_4_lô: các_số_từ_4_lô.length,
+      số_từ_4_lô_ra_lại: các_số_từ_4_lô.filter((mục) => mục.có).length,
+      lời_lỗ_từ_4_lô: thưởng_từ_4_lô - vốn_từ_4_lô,
+      vốn_từ_4_lô,
+      số_từ_5_lô: các_số_từ_5_lô.length,
+      số_từ_5_lô_ra_lại: các_số_từ_5_lô.filter((mục) => mục.có).length,
+      lời_lỗ_từ_5_lô: thưởng_từ_5_lô - vốn_từ_5_lô,
+      vốn_từ_5_lô,
       vốn,
       lời_lỗ: thưởng - vốn,
+      vốn_mỗi_số: (số_đài_theo_ngày.get(ngày) ?? 0) * giá.giá_mỗi_đài,
+      thưởng_mỗi_lô: giá.tiền_thưởng_mỗi_lô,
       nhãn_xem_trước: '',
       chưa_có_kết_quả: false,
     })
@@ -443,20 +486,34 @@ const các_dòng_năm_trước = computed<Dòng_Năm_Trước[]>(() => {
       kết_quả.push({
         ngày: hôm_nay_chuỗi,
         nhãn_xem_trước: nhãn,
+        vốn_mỗi_số: 0,
+        thưởng_mỗi_lô: giá.tiền_thưởng_mỗi_lô,
         thời_điểm: đổi_ngày_thành_số(hôm_nay_chuỗi),
         ngày_năm_trước,
         các_số: [...năm_trước.entries()]
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([số, lô_trước]) => ({ số, lô_trước, có: false, lô_nay: 0 })),
         số_trùng: 0,
-        số_từ_2_lô: [...năm_trước.values()].filter((lô) => lô >= 2).length,
-        số_từ_2_lô_ra_lại: 0,
-        lời_lỗ_từ_2_lô: null,
-        vốn_từ_2_lô: 0,
+        số_chỉ_1_lô: [...năm_trước.values()].filter((lô) => lô === 1).length,
+        số_chỉ_1_lô_ra_lại: 0,
+        lời_lỗ_chỉ_1_lô: null,
+        vốn_chỉ_1_lô: 0,
+        số_chỉ_2_lô: [...năm_trước.values()].filter((lô) => lô === 2).length,
+        số_chỉ_2_lô_ra_lại: 0,
+        lời_lỗ_chỉ_2_lô: null,
+        vốn_chỉ_2_lô: 0,
         vốn_từ_3_lô: 0,
         số_từ_3_lô: [...năm_trước.values()].filter((lô) => lô >= 3).length,
         số_từ_3_lô_ra_lại: 0,
         lời_lỗ_từ_3_lô: null,
+        số_từ_4_lô: [...năm_trước.values()].filter((lô) => lô >= 4).length,
+        số_từ_4_lô_ra_lại: 0,
+        lời_lỗ_từ_4_lô: null,
+        vốn_từ_4_lô: 0,
+        số_từ_5_lô: [...năm_trước.values()].filter((lô) => lô >= 5).length,
+        số_từ_5_lô_ra_lại: 0,
+        lời_lỗ_từ_5_lô: null,
+        vốn_từ_5_lô: 0,
         vốn: 0,
         lời_lỗ: null,
         chưa_có_kết_quả: true,
@@ -465,9 +522,92 @@ const các_dòng_năm_trước = computed<Dòng_Năm_Trước[]>(() => {
   }
   return kết_quả.sort((a, b) => b.thời_điểm - a.thời_điểm)
 })
+// Bộ lọc theo số năm trước: nhập "30(2)" (số 30 đã ra đúng 2 lô năm trước) hoặc "30" (bất kỳ số lô),
+// đúng cú pháp thì thành 1 nút; bấm nút để bật/tắt lọc, các ngày hiện ra là ngày có ít nhất 1 số khớp nút đang bật
+type Bộ_Lọc_Số = { số: string; lô: number | null; bật: boolean }
+const nhập_bộ_lọc_số = ref('')
+const lỗi_bộ_lọc_số = ref(false)
+// Lưu trong localStorage, tách riêng cho 2 số cuối và 3 số cuối (nút của số này không dùng được cho số kia)
+const KHÓA_LƯU_BỘ_LỌC_SỐ = 'loto_bo_loc_so_nam_truoc'
+const đọc_bộ_lọc_đã_lưu = (): Record<string, Bộ_Lọc_Số[]> => {
+  try {
+    const dữ_liệu = JSON.parse(localStorage.getItem(KHÓA_LƯU_BỘ_LỌC_SỐ) ?? '{}')
+    const kết_quả: Record<string, Bộ_Lọc_Số[]> = {}
+    for (const độ_dài of ['2', '3']) {
+      const danh_sách: unknown = dữ_liệu?.[độ_dài]
+      kết_quả[độ_dài] = Array.isArray(danh_sách)
+        ? danh_sách
+            .filter(
+              (mục) =>
+                typeof mục?.số === 'string' &&
+                mục.số.length === Number(độ_dài) &&
+                (mục.lô === null || typeof mục.lô === 'number'),
+            )
+            .map((mục) => ({ số: mục.số, lô: mục.lô, bật: mục.bật !== false }))
+        : []
+    }
+    return kết_quả
+  } catch {
+    return { '2': [], '3': [] }
+  }
+}
+const bộ_lọc_đã_lưu = đọc_bộ_lọc_đã_lưu()
+const các_bộ_lọc_số = ref<Bộ_Lọc_Số[]>(bộ_lọc_đã_lưu[String(số_chữ_số_so_sánh.value)] ?? [])
+watch(
+  các_bộ_lọc_số,
+  (danh_sách) => {
+    bộ_lọc_đã_lưu[String(số_chữ_số_so_sánh.value)] = danh_sách.map((mục) => ({ ...mục }))
+    try {
+      localStorage.setItem(KHÓA_LƯU_BỘ_LỌC_SỐ, JSON.stringify(bộ_lọc_đã_lưu))
+    } catch {
+      // không lưu được (chế độ riêng tư, bị chặn): vẫn dùng bình thường, chỉ không nhớ lại
+    }
+  },
+  { deep: true },
+)
+const nhãn_bộ_lọc = (bộ_lọc: Bộ_Lọc_Số) => (bộ_lọc.lô === null ? bộ_lọc.số : `${bộ_lọc.số}(${bộ_lọc.lô})`)
+const thêm_bộ_lọc_số = () => {
+  const khớp = new RegExp(`^(\\d{${số_chữ_số_so_sánh.value}})(?:\\((\\d{1,2})\\))?$`).exec(
+    nhập_bộ_lọc_số.value.trim(),
+  )
+  if (!khớp) {
+    lỗi_bộ_lọc_số.value = nhập_bộ_lọc_số.value.trim() !== ''
+    return
+  }
+  lỗi_bộ_lọc_số.value = false
+  const lô = khớp[2] === undefined ? null : Number(khớp[2])
+  const bộ_lọc: Bộ_Lọc_Số = { số: khớp[1], lô, bật: true }
+  if (!các_bộ_lọc_số.value.some((mục) => nhãn_bộ_lọc(mục) === nhãn_bộ_lọc(bộ_lọc))) {
+    các_bộ_lọc_số.value.push(bộ_lọc)
+  }
+  nhập_bộ_lọc_số.value = ''
+}
+// đổi giữa 2 và 3 số cuối thì chuyển sang bộ nút của độ dài đó
+watch(số_chữ_số_so_sánh, (độ_dài) => {
+  các_bộ_lọc_số.value = (bộ_lọc_đã_lưu[String(độ_dài)] ?? []).map((mục) => ({ ...mục }))
+  nhập_bộ_lọc_số.value = ''
+  lỗi_bộ_lọc_số.value = false
+})
+const khớp_bộ_lọc_đang_bật = (mục: { số: string; lô_trước: number }) =>
+  các_bộ_lọc_số.value.some(
+    (lọc) => lọc.bật && lọc.số === mục.số && (lọc.lô === null || lọc.lô === mục.lô_trước),
+  )
+const có_bộ_lọc_đang_bật = computed(() => các_bộ_lọc_số.value.some((mục) => mục.bật))
+// Các số của dòng khớp bộ lọc đang bật, và lời/lỗ nếu chỉ mua các số đó (null = chưa có kết quả)
+const các_số_khớp_lọc = (dòng: Dòng_Năm_Trước) => dòng.các_số.filter(khớp_bộ_lọc_đang_bật)
+const lời_lỗ_số_lọc = (dòng: Dòng_Năm_Trước) => {
+  if (dòng.chưa_có_kết_quả) return null
+  const các_số = các_số_khớp_lọc(dòng)
+  const lô = các_số.reduce((tổng, mục) => tổng + mục.lô_nay, 0)
+  return lô * dòng.thưởng_mỗi_lô - các_số.length * dòng.vốn_mỗi_số
+}
+const các_dòng_năm_trước_hiển_thị = computed(() => {
+  if (!các_bộ_lọc_số.value.some((mục) => mục.bật)) return các_dòng_năm_trước.value
+  return các_dòng_năm_trước.value.filter((dòng) => dòng.các_số.some(khớp_bộ_lọc_đang_bật))
+})
 const thống_kê_năm_trước = computed(() => {
   // ngày chưa có kết quả không tính vào thống kê
-  const các_dòng = các_dòng_năm_trước.value.filter((dòng) => !dòng.chưa_có_kết_quả)
+  const các_dòng = các_dòng_năm_trước_hiển_thị.value.filter((dòng) => !dòng.chưa_có_kết_quả)
   const tổng_số = các_dòng.reduce((tổng, dòng) => tổng + dòng.các_số.length, 0)
   const số_trùng = các_dòng.reduce((tổng, dòng) => tổng + dòng.số_trùng, 0)
   const nhóm_lô = (
@@ -493,11 +633,17 @@ const thống_kê_năm_trước = computed(() => {
     vốn: các_dòng.reduce((tổng, dòng) => tổng + dòng.vốn, 0),
     lời_lỗ: các_dòng.reduce((tổng, dòng) => tổng + (dòng.lời_lỗ ?? 0), 0),
     tỉ_lệ: tổng_số ? (số_trùng / tổng_số) * 100 : 0,
-    từ_2_lô: nhóm_lô(
-      (dòng) => dòng.số_từ_2_lô,
-      (dòng) => dòng.số_từ_2_lô_ra_lại,
-      (dòng) => dòng.vốn_từ_2_lô,
-      (dòng) => dòng.lời_lỗ_từ_2_lô,
+    chỉ_1_lô: nhóm_lô(
+      (dòng) => dòng.số_chỉ_1_lô,
+      (dòng) => dòng.số_chỉ_1_lô_ra_lại,
+      (dòng) => dòng.vốn_chỉ_1_lô,
+      (dòng) => dòng.lời_lỗ_chỉ_1_lô,
+    ),
+    chỉ_2_lô: nhóm_lô(
+      (dòng) => dòng.số_chỉ_2_lô,
+      (dòng) => dòng.số_chỉ_2_lô_ra_lại,
+      (dòng) => dòng.vốn_chỉ_2_lô,
+      (dòng) => dòng.lời_lỗ_chỉ_2_lô,
     ),
     từ_3_lô: nhóm_lô(
       (dòng) => dòng.số_từ_3_lô,
@@ -505,11 +651,23 @@ const thống_kê_năm_trước = computed(() => {
       (dòng) => dòng.vốn_từ_3_lô,
       (dòng) => dòng.lời_lỗ_từ_3_lô,
     ),
+    từ_4_lô: nhóm_lô(
+      (dòng) => dòng.số_từ_4_lô,
+      (dòng) => dòng.số_từ_4_lô_ra_lại,
+      (dòng) => dòng.vốn_từ_4_lô,
+      (dòng) => dòng.lời_lỗ_từ_4_lô,
+    ),
+    từ_5_lô: nhóm_lô(
+      (dòng) => dòng.số_từ_5_lô,
+      (dòng) => dòng.số_từ_5_lô_ra_lại,
+      (dòng) => dòng.vốn_từ_5_lô,
+      (dòng) => dòng.lời_lỗ_từ_5_lô,
+    ),
   }
 })
 
 // Theo từng đài, tách theo thứ trong tuần: những số (2 hoặc 3 số cuối) ra nhiều nhất trong năm đang chọn
-const SỐ_HAY_RA_MỖI_ĐÀI = 10
+const SỐ_HAY_RA_MỖI_ĐÀI = ref<10 | 20 | 50 | 100>(10)
 const số_chữ_số_theo_đài = ref<2 | 3>(2)
 // lô = cả 18 số; đầu = giải 8 (2 số cuối) hoặc giải 7 (3 số cuối); cuối = giải đặc biệt; đầu_cuối = cả hai
 const chế_độ_theo_đài = ref<'lô' | 'đầu' | 'cuối' | 'đầu_cuối'>('lô')
@@ -521,10 +679,9 @@ type Đài_Hay_Ra = {
   các_số: Số_Hay_Ra[] // nhiều nhất trước; bằng nhau thì xếp theo số
 }
 // Tên đài bị ghi nhầm trong sheet: (đài, thứ) -> tên đúng. Ví dụ thứ 5 phải là Bình Thuận (BTH) nhưng sheet ghi BT
-// (trùng với Bến Tre quay thứ 3); ngày 09/11/2026 (thứ 2) ghi TH thay vì HCM. Chỉ áp dụng cho lựa chọn 6.
+// (trùng với Bến Tre quay thứ 3). Chỉ áp dụng cho lựa chọn 6.
 const SỬA_TÊN_ĐÀI: { đài: string; thứ: number; thành: string }[] = [
   { đài: 'BT', thứ: 4, thành: 'BTH' },
-  { đài: 'TH', thứ: 1, thành: 'HCM' },
 ]
 const các_đài_hay_ra = computed<Đài_Hay_Ra[]>(() => {
   const độ_dài = số_chữ_số_theo_đài.value
@@ -561,7 +718,7 @@ const các_đài_hay_ra = computed<Đài_Hay_Ra[]>(() => {
       các_số: [...nhóm.đếm.entries()]
         .map(([số, số_lần]) => ({ số, số_lần }))
         .sort((a, b) => b.số_lần - a.số_lần || a.số.localeCompare(b.số))
-        .slice(0, SỐ_HAY_RA_MỖI_ĐÀI),
+        .slice(0, SỐ_HAY_RA_MỖI_ĐÀI.value),
     }))
     .sort((a, b) => a.đài.localeCompare(b.đài))
 })
@@ -576,9 +733,23 @@ const THỨ_THEO_TUẦN = [
   { thứ: 6, nhãn: 'Thứ 7' },
   { thứ: 0, nhãn: 'Chủ nhật' },
 ]
+// Số ngày có quay xổ số của từng thứ trong năm đang chọn (đếm theo ngày, không theo đài)
+const số_ngày_quay_theo_thứ = computed(() => {
+  const ngày_theo_thứ = new Map<number, Set<string>>()
+  for (const hàng of các_hàng.value) {
+    const thứ = new Date(đổi_ngày_thành_số(hàng[1])).getUTCDay()
+    const tập = ngày_theo_thứ.get(thứ) ?? new Set<string>()
+    tập.add(hàng[1])
+    ngày_theo_thứ.set(thứ, tập)
+  }
+  return ngày_theo_thứ
+})
+const tên_thứ = (thời_điểm: number) =>
+  THỨ_THEO_TUẦN.find((mục) => mục.thứ === new Date(thời_điểm).getUTCDay())?.nhãn ?? ''
 const các_đài_theo_thứ = computed(() =>
   THỨ_THEO_TUẦN.map(({ thứ, nhãn }) => ({
     nhãn,
+    số_ngày: số_ngày_quay_theo_thứ.value.get(thứ)?.size ?? 0,
     các_đài: các_đài_hay_ra.value.filter((mục) => mục.thứ === thứ),
   })).filter((nhóm) => nhóm.các_đài.length > 0),
 )
@@ -950,8 +1121,11 @@ onMounted(async () => {
           </div>
           <div
             v-for="nhóm in [
-              { nhãn: 'Từ 2 lô', dữ_liệu: thống_kê_năm_trước.từ_2_lô },
+              { nhãn: 'Chỉ 1 lô', dữ_liệu: thống_kê_năm_trước.chỉ_1_lô },
+              { nhãn: 'Chỉ 2 lô', dữ_liệu: thống_kê_năm_trước.chỉ_2_lô },
               { nhãn: 'Từ 3 lô', dữ_liệu: thống_kê_năm_trước.từ_3_lô },
+              { nhãn: 'Từ 4 lô', dữ_liệu: thống_kê_năm_trước.từ_4_lô },
+              { nhãn: 'Từ 5 lô', dữ_liệu: thống_kê_năm_trước.từ_5_lô },
             ]"
             :key="nhóm.nhãn"
             :style="{ marginTop: '4px' }"
@@ -962,6 +1136,46 @@ onMounted(async () => {
             <b :style="{ color: màu_tiền(nhóm.dữ_liệu.lời_lỗ) }">{{
               hiện_tiền(nhóm.dữ_liệu.lời_lỗ)
             }}</b>
+          </div>
+          <div :style="{ marginTop: '8px' }">
+            lọc số năm trước
+            <input
+              v-model="nhập_bộ_lọc_số"
+              :placeholder="số_chữ_số_so_sánh === 2 ? '30(2)' : '300(2)'"
+              :style="{ width: '70px', borderColor: lỗi_bộ_lọc_số ? '#dc2626' : undefined }"
+              @keydown.enter="thêm_bộ_lọc_số"
+              @input="lỗi_bộ_lọc_số = false"
+            />
+            <button type="button" @click="thêm_bộ_lọc_số">Thêm</button>
+            <span v-if="lỗi_bộ_lọc_số" :style="{ color: '#dc2626', marginLeft: '6px' }">
+              sai cú pháp, nhập {{ số_chữ_số_so_sánh === 2 ? '30(2)' : '300(2)' }} (số và số lô năm
+              trước) hoặc chỉ số
+            </span>
+            <span
+              v-for="(bộ_lọc, vị_trí) in các_bộ_lọc_số"
+              :key="nhãn_bộ_lọc(bộ_lọc)"
+              :style="{ marginLeft: '6px', whiteSpace: 'nowrap' }"
+            >
+              <button
+                type="button"
+                :style="{
+                  fontFamily: 'monospace',
+                  fontWeight: bộ_lọc.bật ? 'bold' : 'normal',
+                  background: bộ_lọc.bật ? '#bfdbfe' : undefined,
+                }"
+                @click="bộ_lọc.bật = !bộ_lọc.bật"
+              >
+                {{ nhãn_bộ_lọc(bộ_lọc) }}
+              </button>
+              <button type="button" title="Xóa" @click="các_bộ_lọc_số.splice(vị_trí, 1)">×</button>
+            </span>
+          </div>
+          <div
+            v-if="các_bộ_lọc_số.some((mục) => mục.bật)"
+            :style="{ marginTop: '4px' }"
+          >
+            đang lọc: chỉ hiện các ngày năm trước có
+            {{ các_bộ_lọc_số.filter((mục) => mục.bật).map(nhãn_bộ_lọc).join(' hoặc ') }}
           </div>
           <div :style="{ overflowX: 'auto', marginTop: '8px' }">
             <table
@@ -974,23 +1188,57 @@ onMounted(async () => {
               <thead>
                 <tr>
                   <th :style="{ textAlign: 'left', padding: '2px 14px 2px 0' }">Ngày</th>
+                  <th :style="{ textAlign: 'left', padding: '2px 14px' }">Thứ</th>
+                  <template v-if="có_bộ_lọc_đang_bật">
+                    <th :style="{ textAlign: 'right', padding: '2px 14px' }">Số lọc ra lại</th>
+                    <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (số lọc)</th>
+                  </template>
                   <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ</th>
                   <th :style="{ textAlign: 'left', padding: '2px 14px' }">Cùng ngày năm trước</th>
                   <th :style="{ textAlign: 'right', padding: '2px 14px' }">Ra lại</th>
-                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Từ 2 lô ra lại</th>
-                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (từ 2 lô)</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Chỉ 1 lô ra lại</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (chỉ 1 lô)</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Chỉ 2 lô ra lại</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (chỉ 2 lô)</th>
                   <th :style="{ textAlign: 'right', padding: '2px 14px' }">Từ 3 lô ra lại</th>
                   <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (từ 3 lô)</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Từ 4 lô ra lại</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (từ 4 lô)</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Từ 5 lô ra lại</th>
+                  <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (từ 5 lô)</th>
                   <th :style="{ textAlign: 'left', padding: '2px 0 2px 14px' }">
                     Các số năm trước
                   </th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="dòng in các_dòng_năm_trước" :key="dòng.ngày">
+                <tr v-for="dòng in các_dòng_năm_trước_hiển_thị" :key="dòng.ngày">
                   <td :style="{ padding: '2px 14px 2px 0', verticalAlign: 'top' }">
                     {{ dòng.ngày }}<template v-if="dòng.chưa_có_kết_quả"> ({{ dòng.nhãn_xem_trước }})</template>
                   </td>
+                  <td :style="{ padding: '2px 14px', verticalAlign: 'top' }">
+                    {{ tên_thứ(dòng.thời_điểm) }}
+                  </td>
+                  <template v-if="có_bộ_lọc_đang_bật">
+                    <td :style="{ textAlign: 'right', padding: '2px 14px', verticalAlign: 'top' }">
+                      {{ các_số_khớp_lọc(dòng).filter((mục) => mục.có).length }}/{{
+                        các_số_khớp_lọc(dòng).length
+                      }}
+                      ({{ các_số_khớp_lọc(dòng).map((mục) => `${mục.số}${mục.có ? `(${mục.lô_nay})` : ''}`).join(', ') }})
+                    </td>
+                    <td
+                      :style="{
+                        textAlign: 'right',
+                        padding: '2px 14px',
+                        verticalAlign: 'top',
+                        fontWeight: 'bold',
+                        color:
+                          lời_lỗ_số_lọc(dòng) === null ? 'inherit' : màu_tiền(lời_lỗ_số_lọc(dòng)!),
+                      }"
+                    >
+                      {{ lời_lỗ_số_lọc(dòng) === null ? '—' : hiện_tiền(lời_lỗ_số_lọc(dòng)!) }}
+                    </td>
+                  </template>
                   <td
                     :style="{
                       textAlign: 'right',
@@ -1009,7 +1257,7 @@ onMounted(async () => {
                     {{ dòng.số_trùng }}/{{ dòng.các_số.length }}
                   </td>
                   <td :style="{ textAlign: 'right', padding: '2px 14px', verticalAlign: 'top' }">
-                    {{ dòng.số_từ_2_lô_ra_lại }}/{{ dòng.số_từ_2_lô }}
+                    {{ dòng.số_chỉ_1_lô_ra_lại }}/{{ dòng.số_chỉ_1_lô }}
                   </td>
                   <td
                     :style="{
@@ -1018,10 +1266,25 @@ onMounted(async () => {
                       verticalAlign: 'top',
                       fontWeight: 'bold',
                       color:
-                        dòng.lời_lỗ_từ_2_lô === null ? 'inherit' : màu_tiền(dòng.lời_lỗ_từ_2_lô),
+                        dòng.lời_lỗ_chỉ_1_lô === null ? 'inherit' : màu_tiền(dòng.lời_lỗ_chỉ_1_lô),
                     }"
                   >
-                    {{ dòng.lời_lỗ_từ_2_lô === null ? '—' : hiện_tiền(dòng.lời_lỗ_từ_2_lô) }}
+                    {{ dòng.lời_lỗ_chỉ_1_lô === null ? '—' : hiện_tiền(dòng.lời_lỗ_chỉ_1_lô) }}
+                  </td>
+                  <td :style="{ textAlign: 'right', padding: '2px 14px', verticalAlign: 'top' }">
+                    {{ dòng.số_chỉ_2_lô_ra_lại }}/{{ dòng.số_chỉ_2_lô }}
+                  </td>
+                  <td
+                    :style="{
+                      textAlign: 'right',
+                      padding: '2px 14px',
+                      verticalAlign: 'top',
+                      fontWeight: 'bold',
+                      color:
+                        dòng.lời_lỗ_chỉ_2_lô === null ? 'inherit' : màu_tiền(dòng.lời_lỗ_chỉ_2_lô),
+                    }"
+                  >
+                    {{ dòng.lời_lỗ_chỉ_2_lô === null ? '—' : hiện_tiền(dòng.lời_lỗ_chỉ_2_lô) }}
                   </td>
                   <td :style="{ textAlign: 'right', padding: '2px 14px', verticalAlign: 'top' }">
                     {{ dòng.số_từ_3_lô_ra_lại }}/{{ dòng.số_từ_3_lô }}
@@ -1038,7 +1301,7 @@ onMounted(async () => {
                                 ? '#16a34a'
                                 : '#dc2626',
                           }"
-                          >{{ mục.số }}</span
+                          >{{ mục.số }}<template v-if="mục.lô_nay > 0">({{ mục.lô_nay }})</template></span
                         ></template
                       >)
                     </template>
@@ -1055,6 +1318,70 @@ onMounted(async () => {
                   >
                     {{ dòng.lời_lỗ_từ_3_lô === null ? '—' : hiện_tiền(dòng.lời_lỗ_từ_3_lô) }}
                   </td>
+                  <td :style="{ textAlign: 'right', padding: '2px 14px', verticalAlign: 'top' }">
+                    {{ dòng.số_từ_4_lô_ra_lại }}/{{ dòng.số_từ_4_lô }}
+                    <template v-if="dòng.số_từ_4_lô > 0">
+                      (<template
+                        v-for="(mục, vị_trí) in dòng.các_số.filter((mục) => mục.lô_trước >= 4)"
+                        :key="mục.số"
+                        ><template v-if="vị_trí > 0">, </template
+                        ><span
+                          :style="{
+                            color: dòng.chưa_có_kết_quả
+                              ? 'inherit'
+                              : mục.có
+                                ? '#16a34a'
+                                : '#dc2626',
+                          }"
+                          >{{ mục.số }}<template v-if="mục.lô_nay > 0">({{ mục.lô_nay }})</template></span
+                        ></template
+                      >)
+                    </template>
+                  </td>
+                  <td
+                    :style="{
+                      textAlign: 'right',
+                      padding: '2px 14px',
+                      verticalAlign: 'top',
+                      fontWeight: 'bold',
+                      color:
+                        dòng.lời_lỗ_từ_4_lô === null ? 'inherit' : màu_tiền(dòng.lời_lỗ_từ_4_lô),
+                    }"
+                  >
+                    {{ dòng.lời_lỗ_từ_4_lô === null ? '—' : hiện_tiền(dòng.lời_lỗ_từ_4_lô) }}
+                  </td>
+                  <td :style="{ textAlign: 'right', padding: '2px 14px', verticalAlign: 'top' }">
+                    {{ dòng.số_từ_5_lô_ra_lại }}/{{ dòng.số_từ_5_lô }}
+                    <template v-if="dòng.số_từ_5_lô > 0">
+                      (<template
+                        v-for="(mục, vị_trí) in dòng.các_số.filter((mục) => mục.lô_trước >= 5)"
+                        :key="mục.số"
+                        ><template v-if="vị_trí > 0">, </template
+                        ><span
+                          :style="{
+                            color: dòng.chưa_có_kết_quả
+                              ? 'inherit'
+                              : mục.có
+                                ? '#16a34a'
+                                : '#dc2626',
+                          }"
+                          >{{ mục.số }}<template v-if="mục.lô_nay > 0">({{ mục.lô_nay }})</template></span
+                        ></template
+                      >)
+                    </template>
+                  </td>
+                  <td
+                    :style="{
+                      textAlign: 'right',
+                      padding: '2px 14px',
+                      verticalAlign: 'top',
+                      fontWeight: 'bold',
+                      color:
+                        dòng.lời_lỗ_từ_5_lô === null ? 'inherit' : màu_tiền(dòng.lời_lỗ_từ_5_lô),
+                    }"
+                  >
+                    {{ dòng.lời_lỗ_từ_5_lô === null ? '—' : hiện_tiền(dòng.lời_lỗ_từ_5_lô) }}
+                  </td>
                   <td :style="{ padding: '2px 0 2px 14px' }">
                     <span
                       v-for="mục in dòng.các_số"
@@ -1062,6 +1389,8 @@ onMounted(async () => {
                       :style="{
                         color: dòng.chưa_có_kết_quả ? 'inherit' : mục.có ? '#16a34a' : '#dc2626',
                         marginRight: '6px',
+                        textDecoration: khớp_bộ_lọc_đang_bật(mục) ? 'underline' : 'none',
+                        fontWeight: khớp_bộ_lọc_đang_bật(mục) ? 'bold' : 'normal',
                       }"
                     >
                       {{ mục.số }}<template v-if="mục.lô_trước > 1">({{ mục.lô_trước }})</template>
@@ -1081,7 +1410,14 @@ onMounted(async () => {
             <option :value="2">2 số cuối</option>
             <option :value="3">3 số cuối</option>
           </select>
-          — mỗi đài hiện {{ SỐ_HAY_RA_MỖI_ĐÀI }} số ra nhiều nhất
+          — mỗi đài hiện
+          <select v-model.number="SỐ_HAY_RA_MỖI_ĐÀI">
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+            <option :value="100">100</option>
+          </select>
+          số ra nhiều nhất
           {{ năm_lọc ? `trong năm ${năm_lọc}` : 'trong tất cả các năm' }}; số (n) = n lô
         </div>
         <div :style="{ marginTop: '6px' }">
@@ -1094,7 +1430,7 @@ onMounted(async () => {
           </select>
         </div>
         <div v-for="nhóm in các_đài_theo_thứ" :key="nhóm.nhãn" :style="{ marginTop: '10px' }">
-          <b>{{ nhóm.nhãn }}</b>
+          <b>{{ nhóm.nhãn }}</b> ({{ nhóm.số_ngày }} lần quay)
           <div :style="{ overflowX: 'auto' }">
             <table
               :style="{

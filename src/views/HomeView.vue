@@ -103,6 +103,8 @@ const số_lần_xuất_hiện_tới = ref<number>(2)
 const số_lượng_vé_dự_đoán = ref<number>(1000)
 // loại vé giống từ ngần này vị trí với một bộ trong thống kê dự đoán (0 là không loại)
 const số_vị_trí_giống_để_loại = ref<number>(5)
+// nguồn các bộ vị trí để so vé giống: 'thống kê' = bộ đã từng trúng từ 5 số (ít), 'tất cả' = mọi bộ vị trí dự đoán của các kỳ trước
+const nguồn_loại_vé_giống = ref<'thống kê' | 'tất cả'>('thống kê')
 
 // số vị trí nằm trong từng nhóm (cột hoặc hàng) có ít nhất 1 vị trí
 function đếm_vị_trí_mỗi_nhóm(ds_vị_trí: number[], lấy_nhóm: (vị_trí: number) => number): number[] {
@@ -206,6 +208,17 @@ const danh_sách_theo_xuất_hiện = ref<number>(2)
 
 const danh_sách_dữ_liệu_hiển_thị_45 = ref<Array<Đối_Tượng_Xổ_Số>>()
 const danh_sách_dữ_liệu_hiển_thị_55 = ref<Array<Đối_Tượng_Xổ_Số>>()
+
+// lọc các kỳ có cùng ngày/tháng ở mọi năm (nhập dạng DD/MM, ví dụ 21/11; để trống là không lọc)
+const ngày_tháng_lọc = ref<string>('')
+const lọc_theo_ngày_tháng = (danh_sách?: Array<Đối_Tượng_Xổ_Số>) => {
+  const [ngày, tháng] = ngày_tháng_lọc.value.trim().split('/')
+  if (!danh_sách || !ngày || !tháng) return danh_sách
+  const tiền_tố = `${ngày.padStart(2, '0')}/${tháng.padStart(2, '0')}/`
+  return danh_sách.filter((dữ_liệu) => dữ_liệu.ngày_xổ_số.startsWith(tiền_tố))
+}
+const danh_sách_đã_lọc_45 = computed(() => lọc_theo_ngày_tháng(danh_sách_dữ_liệu_hiển_thị_45.value))
+const danh_sách_đã_lọc_55 = computed(() => lọc_theo_ngày_tháng(danh_sách_dữ_liệu_hiển_thị_55.value))
 
 //
 // chạy các hàm
@@ -851,7 +864,11 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
   }
   // bộ vị trí đã từng trúng từ 5 số (thống kê dự đoán): vé giống nhiều vị trí với bộ này bị loại
   let bộ_vị_trí_thống_kê: number[][] = []
-  if (số_giống > 0) {
+  const dùng_tất_cả_vị_trí = nguồn_loại_vé_giống.value === 'tất cả'
+  if (số_giống > 0 && dùng_tất_cả_vị_trí) {
+    // thống kê quá ít bộ nên so với mọi bộ vị trí dự đoán của các kỳ trước kỳ mới nhất
+    bộ_vị_trí_thống_kê = danh_sách_dữ_liệu.slice(1).flatMap((kỳ_cũ) => kỳ_cũ.vị_trí_ds_xuất_hiện)
+  } else if (số_giống > 0) {
     await dịch_vụ_indexeddb.khởi_tạo()
     const đã_lưu = await dịch_vụ_indexeddb.lấy_dữ_liệu_theo_tên(lấy_tên_lưu_trữ(danh_sách_dữ_liệu))
     bộ_vị_trí_thống_kê = (đã_lưu[0]?.dữ_liệu ?? []).map((mục) => mục.ds_vị_trí)
@@ -890,7 +907,7 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
   )
   console.log(
     số_giống > 0
-      ? `loại vé giống từ ${số_giống} vị trí với ${bộ_vị_trí_thống_kê.length} bộ trong thống kê dự đoán`
+      ? `loại vé giống từ ${số_giống} vị trí với ${bộ_vị_trí_thống_kê.length} bộ trong ${dùng_tất_cả_vị_trí ? 'tất cả vị trí dự đoán' : 'thống kê dự đoán'}`
       : 'không loại vé theo thống kê dự đoán',
   )
   if (số_giống > 0 && bộ_vị_trí_thống_kê.length > 0) {
@@ -923,7 +940,7 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
       (ds_vị_trí) => qua_bộ_lọc_vị_trí(ds_vị_trí) && không_giống_thống_kê(ds_vị_trí),
       tạo_bộ_sinh_ngẫu_nhiên(
         tạo_seed_từ_chuỗi(
-          `${kỳ.loại_xổ_số}|${kỳ.ngày_xổ_số}|${tên}|${từ}|${tới}|${số_vé}|${số_giống}`,
+          `${kỳ.loại_xổ_số}|${kỳ.ngày_xổ_số}|${tên}|${từ}|${tới}|${số_vé}|${số_giống}|${nguồn_loại_vé_giống.value}`,
         ),
       ),
     )
@@ -948,7 +965,7 @@ async function tạo_dự_đoán_cho_các_danh_sách(danh_sách_dữ_liệu: Arr
   console.groupEnd()
 
   // mỗi tổ hợp điều kiện lưu một bản ghi riêng, tạo lại cùng điều kiện thì ghi đè đúng bản đó
-  const điều_kiện = `số lần ${từ}-${tới}, ${số_vé} vé, loại giống ${số_giống}, cột ${lọc_số_trùng_trong_cột.value}, hàng ${lọc_số_cùng_hàng.value}, tối đa mỗi cột ${số_tối_đa_mỗi_cột.value}`
+  const điều_kiện = `số lần ${từ}-${tới}, ${số_vé} vé, loại giống ${số_giống}${dùng_tất_cả_vị_trí ? ' (tất cả vị trí)' : ''}, cột ${lọc_số_trùng_trong_cột.value}, hàng ${lọc_số_cùng_hàng.value}, tối đa mỗi cột ${số_tối_đa_mỗi_cột.value}`
   await ghi_bộ_nhớ_đệm<Dự_Đoán_Theo_Số_Lần_Đã_Lưu>(
     `${TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN}${kỳ.loại_xổ_số}|${ngày_dự_đoán}|${điều_kiện}`,
     {
@@ -1386,7 +1403,12 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
                 <input v-model="số_lượng_vé_dự_đoán" type="text" :style="{ width: '30px' }" />
                 , loại vé giống
                 <input v-model="số_vị_trí_giống_để_loại" type="text" :style="{ width: '20px' }" />
-                vị trí với thống kê dự đoán (0 là không loại)
+                vị trí với
+                <select v-model="nguồn_loại_vé_giống">
+                  <option value="thống kê">thống kê dự đoán</option>
+                  <option value="tất cả">tất cả vị trí dự đoán</option>
+                </select>
+                (0 là không loại)
               </div>
               <div>
                 <button @click="tạo_dự_đoán_cho_các_danh_sách(dữ_liệu_xổ_số_55)">
@@ -1546,12 +1568,22 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
       </div>
     </div>
 
+    <div>
+      lọc cùng ngày/tháng mọi năm (DD/MM, để trống là tất cả)
+      <input
+        v-model="ngày_tháng_lọc"
+        type="text"
+        placeholder="21/11"
+        :style="{ width: '60px' }"
+      />
+    </div>
+
     <div :style="{ display: 'flex', gap: '40px' }">
       <div :style="{ width: '700px' }">
-        Tổng số dữ liệu 55: {{ danh_sách_dữ_liệu_hiển_thị_55?.length }}
+        Tổng số dữ liệu 55: {{ danh_sách_đã_lọc_55?.length }}
       </div>
       <div :style="{ width: '700px' }">
-        Tổng số dữ liệu 45: {{ danh_sách_dữ_liệu_hiển_thị_45?.length }}
+        Tổng số dữ liệu 45: {{ danh_sách_đã_lọc_45?.length }}
       </div>
     </div>
 
@@ -1562,7 +1594,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
 
       <div :style="{ width: '700px', display: 'flex', 'flex-direction': 'column', gap: '12px' }">
         <div
-          v-for="(dữ_liệu, vị_trí) in danh_sách_dữ_liệu_hiển_thị_55?.slice(
+          v-for="(dữ_liệu, vị_trí) in danh_sách_đã_lọc_55?.slice(
             0,
             số_dữ_liệu_sẽ_được_hiển_thị,
           )"
@@ -1618,7 +1650,7 @@ function dự_đoán_bằng_cách_tăng(loại: number) {
 
       <div :style="{ width: '700px', display: 'flex', 'flex-direction': 'column', gap: '12px' }">
         <div
-          v-for="(dữ_liệu, vị_trí) in danh_sách_dữ_liệu_hiển_thị_45?.slice(
+          v-for="(dữ_liệu, vị_trí) in danh_sách_đã_lọc_45?.slice(
             0,
             số_dữ_liệu_sẽ_được_hiển_thị,
           )"
