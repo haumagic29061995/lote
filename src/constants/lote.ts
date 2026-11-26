@@ -17,6 +17,7 @@ const link_xsmn = (gid: string) =>
   `https://docs.google.com/spreadsheets/d/e/${KHÓA_XUẤT_BẢN_XSMN}/pub?gid=${gid}&single=true&output=csv`
 
 export const LINK_CSV_XSMN_THEO_NĂM: Record<string, string> = {
+  '2024': link_xsmn('2083267115'),
   '2025': link_xsmn('1905671078'),
   '2026': link_xsmn('809052019'),
   '2027': link_xsmn('2073046506'),

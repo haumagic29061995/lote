@@ -887,9 +887,17 @@ const lời_lỗ_số_lọc = (dòng: Dòng_Năm_Trước) => {
   const lô = các_số.reduce((tổng, mục) => tổng + mục.lô_nay, 0)
   return lô * dòng.thưởng_mỗi_lô - các_số.length * dòng.vốn_mỗi_số
 }
+// Lọc theo thứ của ngày hiện tại: '' = tất cả; 0 = chủ nhật, 1 = thứ 2 ... 6 = thứ 7
+const thứ_lọc_năm_trước = ref<'' | number>('')
 const các_dòng_năm_trước_hiển_thị = computed(() => {
-  if (!các_bộ_lọc_số.value.some((mục) => mục.bật)) return các_dòng_năm_trước.value
-  return các_dòng_năm_trước.value.filter((dòng) => dòng.các_số.some(khớp_bộ_lọc_đang_bật))
+  const theo_thứ =
+    thứ_lọc_năm_trước.value === ''
+      ? các_dòng_năm_trước.value
+      : các_dòng_năm_trước.value.filter(
+          (dòng) => new Date(dòng.thời_điểm).getUTCDay() === thứ_lọc_năm_trước.value,
+        )
+  if (!các_bộ_lọc_số.value.some((mục) => mục.bật)) return theo_thứ
+  return theo_thứ.filter((dòng) => dòng.các_số.some(khớp_bộ_lọc_đang_bật))
 })
 // Đài nào đánh theo đài đó (dùng cho "chỉ 2 lô" và "từ 3 lô"): số ra đủ lô (cộng các đài) cùng ngày năm trước, ra ở những đài nào thì chỉ mua
 // bấy nhiêu đài. Hai ngày khác thứ nên khác đài: ghép theo vị trí (đài thứ i năm trước -> đài thứ i hôm nay, theo thứ
@@ -1337,12 +1345,28 @@ const thống_kê_phần_chục = computed(() => {
       // (ví dụ 40, 52, 36 và 30, 62, 23 cho ra 2x, 3x, 4x, 5x, 6x); mua cả 10 số của các phần chục đó cho đầu và cuối
       // Thứ tự theo lần xuất hiện đầu tiên (giải 8 trước, giải đặc biệt sau); số lần = bao nhiêu số năm trước thuộc phần chục đó
       const số_lần_theo_chục = new Map<number, number>()
+      const số_năm_trước_theo_chục = new Map<number, string[]>() // các số năm trước tạo ra phần chục đó, theo thứ tự xuất hiện
       for (const số of các_đài_năm_trước.flatMap((mục) => [mục.giải_8, mục.đặc_biệt])) {
         if (số === '') continue
         const chục = Math.floor(Number(số) / 10)
         số_lần_theo_chục.set(chục, (số_lần_theo_chục.get(chục) ?? 0) + 1)
+        số_năm_trước_theo_chục.set(chục, [...(số_năm_trước_theo_chục.get(chục) ?? []), số])
       }
       const phần_chục_dự_đoán = [...số_lần_theo_chục.keys()]
+      // Kết quả hôm đó theo phần chục: giải 8 của mọi đài trước, giải đặc biệt sau; mỗi kết quả (1 đài, 1 giải) đếm 1 lần,
+      // phần chục nhiều kết quả nhất xếp trước, bằng nhau thì theo thứ tự xuất hiện (ví dụ 7x(2), 2x, 5x, 3x, 9x)
+      const số_kết_quả_theo_chục = new Map<number, number>()
+      for (const số of [
+        ...các_đài.map((mục) => mục.giải_8),
+        ...các_đài.map((mục) => mục.đặc_biệt),
+      ]) {
+        if (số === '') continue
+        const chục = Math.floor(Number(số) / 10)
+        số_kết_quả_theo_chục.set(chục, (số_kết_quả_theo_chục.get(chục) ?? 0) + 1)
+      }
+      const phần_chục_kết_quả = [...số_kết_quả_theo_chục.entries()]
+        .map(([chục, số_lần]) => ({ chục, số_lần }))
+        .sort((a, b) => b.số_lần - a.số_lần)
       const trong_dự_đoán = (số: string) =>
         số !== '' && phần_chục_dự_đoán.includes(Math.floor(Number(số) / 10))
       const số_đài_có_giải = chưa_có
@@ -1368,12 +1392,14 @@ const thống_kê_phần_chục = computed(() => {
         khớp_năm_trước: tính_khớp(các_đài_năm_trước, các_đài, số_đài_hôm_nay),
         lô_năm_trước: tính_lô(các_đài_năm_trước, lô_theo_ngày.get(ngày), số_đài_hôm_nay),
         chính_đài: tính_chính_đài(đổi_ngày_thành_số(ngày)),
+        phần_chục_kết_quả,
         dự_đoán: {
           phần_chục: phần_chục_dự_đoán,
           // từng phần chục dự đoán: xanh nếu hôm nay giải 8 hoặc giải đặc biệt của đài nào đó rơi vào, đỏ nếu không
           chi_tiết: phần_chục_dự_đoán.map((chục) => ({
             chục,
             số_lần: số_lần_theo_chục.get(chục) ?? 1,
+            số_năm_trước: số_năm_trước_theo_chục.get(chục) ?? [],
             trúng: các_đài.some((mục) =>
               [mục.giải_8, mục.đặc_biệt].some(
                 (số) => số !== '' && Math.floor(Number(số) / 10) === chục,
@@ -1399,12 +1425,38 @@ const thống_kê_phần_chục = computed(() => {
   const tổng_khớp_tiền = cộng((ngày) => ngày.khớp_năm_trước)
   const tổng_lô_tiền = cộng((ngày) => ngày.lô_năm_trước)
   const tổng_chính_đài_tiền = cộng((ngày) => ngày.chính_đài)
+  // Tổng theo từng phần chục 00–09, 1x … 9x trên các ngày đã có kết quả: số lần giải 8 và 2 số cuối giải đặc biệt
+  // (mỗi đài mỗi ngày 1 lần) rơi vào phần chục đó; số ngày phần chục đó được dự đoán (theo năm trước) và trong đó
+  // số ngày trúng (hôm đó giải 8 hoặc giải đặc biệt của đài nào đó rơi vào phần chục đó)
+  const tổng_theo_chục = Array.from({ length: 10 }, (_, chục) => ({
+    chục,
+    giải_8: 0,
+    đặc_biệt: 0,
+    dự_đoán: 0,
+    trúng: 0,
+    có_kết_quả: 0, // số ngày phần chục đó có ít nhất 1 kết quả (giải 8 hoặc giải đặc biệt của đài nào đó)
+  }))
+  const số_ngày_đã_có = các_ngày.filter((ngày) => !ngày.chưa_có).length
+  for (const ngày of các_ngày) {
+    if (ngày.chưa_có) continue
+    for (const mục of ngày.phần_chục_kết_quả) tổng_theo_chục[mục.chục].có_kết_quả++
+    for (const mục of ngày.các_đài) {
+      if (mục.giải_8 !== '') tổng_theo_chục[Math.floor(Number(mục.giải_8) / 10)].giải_8++
+      if (mục.đặc_biệt !== '') tổng_theo_chục[Math.floor(Number(mục.đặc_biệt) / 10)].đặc_biệt++
+    }
+    for (const mục of ngày.dự_đoán.chi_tiết) {
+      tổng_theo_chục[mục.chục].dự_đoán++
+      if (mục.trúng) tổng_theo_chục[mục.chục].trúng++
+    }
+  }
   const phần_trăm = (a: number, b: number) => (b ? (a / b) * 100 : 0)
   return {
     các_ngày,
     tiền_giải_8: tổng_giải_8_tiền,
     tiền_đặc_biệt: tổng_đặc_biệt_tiền,
     tiền_dự_đoán: tổng_dự_đoán_tiền,
+    tổng_theo_chục,
+    số_ngày_đã_có,
     tiền_khớp: tổng_khớp_tiền,
     tiền_lô: tổng_lô_tiền,
     tiền_chính_đài: tổng_chính_đài_tiền,
@@ -2348,7 +2400,14 @@ onMounted(async () => {
             </table>
           </div>
           <div :style="{ marginTop: '8px' }">
-            lọc số năm trước
+            lọc thứ
+            <select v-model="thứ_lọc_năm_trước">
+              <option value="">tất cả</option>
+              <option v-for="mục in THỨ_THEO_TUẦN" :key="mục.thứ" :value="mục.thứ">
+                {{ mục.nhãn }}
+              </option>
+            </select>
+            , lọc số năm trước
             <input
               v-model="nhập_bộ_lọc_số"
               :placeholder="số_chữ_số_so_sánh === 2 ? '30(2)' : '300(2)'"
@@ -3113,6 +3172,40 @@ onMounted(async () => {
           <table :style="{ borderCollapse: 'collapse', fontFamily: 'monospace', fontSize: '14px' }">
             <thead>
               <tr>
+                <th :style="{ textAlign: 'left', padding: '2px 14px 2px 0' }">Phần chục</th>
+                <th :style="{ textAlign: 'right', padding: '2px 14px' }">Có kết quả (ngày)</th>
+                <th :style="{ textAlign: 'right', padding: '2px 14px' }">Tổng dự đoán</th>
+                <th :style="{ textAlign: 'right', padding: '2px 14px' }">Tổng đúng</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="mục in thống_kê_phần_chục.tổng_theo_chục" :key="mục.chục">
+                <td :style="{ padding: '2px 14px 2px 0', fontWeight: 'bold' }">
+                  {{ mục.chục === 0 ? '00' : `${mục.chục}x` }}
+                </td>
+                <td :style="{ textAlign: 'right', padding: '2px 14px' }">
+                  {{ mục.có_kết_quả
+                  }}<template v-if="thống_kê_phần_chục.số_ngày_đã_có > 0">
+                    ({{
+                      ((mục.có_kết_quả / thống_kê_phần_chục.số_ngày_đã_có) * 100).toFixed(0)
+                    }}%)</template
+                  >
+                </td>
+                <td :style="{ textAlign: 'right', padding: '2px 14px' }">{{ mục.dự_đoán }}</td>
+                <td :style="{ textAlign: 'right', padding: '2px 14px' }">
+                  {{ mục.trúng
+                  }}<template v-if="mục.dự_đoán > 0">
+                    ({{ ((mục.trúng / mục.dự_đoán) * 100).toFixed(0) }}%)</template
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div :style="{ overflowX: 'auto', marginTop: '8px' }">
+          <table :style="{ borderCollapse: 'collapse', fontFamily: 'monospace', fontSize: '14px' }">
+            <thead>
+              <tr>
                 <th :style="{ textAlign: 'left', padding: '2px 14px 2px 0' }">Ngày</th>
                 <th :style="{ textAlign: 'left', padding: '2px 14px' }">Thứ</th>
                 <th :style="{ textAlign: 'left', padding: '2px 14px' }">Giải 8 (từng đài)</th>
@@ -3122,6 +3215,10 @@ onMounted(async () => {
                 </th>
                 <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (giải đặc biệt)</th>
                 <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (đầu + cuối)</th>
+                <th :style="{ textAlign: 'left', padding: '2px 14px' }">Dự đoán (phần chục)</th>
+                <th :style="{ textAlign: 'right', padding: '2px 14px' }">Trúng đầu / cuối</th>
+                <th :style="{ textAlign: 'right', padding: '2px 14px' }">Lời/lỗ (dự đoán)</th>
+                <th :style="{ textAlign: 'left', padding: '2px 14px' }">Kết quả (phần chục)</th>
                 <th :style="{ textAlign: 'left', padding: '2px 14px' }">Ngày năm trước</th>
                 <th :style="{ textAlign: 'left', padding: '2px 14px' }">Giải 8 năm trước</th>
                 <th :style="{ textAlign: 'left', padding: '2px 14px' }">
@@ -3136,9 +3233,6 @@ onMounted(async () => {
                 <th :style="{ textAlign: 'left', padding: '2px 14px' }">
                   Số đài nào mua đài đó (15k/số, trúng 80k/lô)
                 </th>
-                <th :style="{ textAlign: 'left', padding: '2px 14px' }">Dự đoán (phần chục)</th>
-                <th :style="{ textAlign: 'right', padding: '2px 14px' }">Trúng đầu / cuối</th>
-                <th :style="{ textAlign: 'right', padding: '2px 0 2px 14px' }">Lời/lỗ (dự đoán)</th>
               </tr>
               <tr>
                 <td
@@ -3197,6 +3291,20 @@ onMounted(async () => {
                 </td>
                 <td :style="{ borderBottom: '1px solid currentColor' }"></td>
                 <td :style="{ borderBottom: '1px solid currentColor' }"></td>
+                <td
+                  :style="{
+                    textAlign: 'right',
+                    padding: '2px 14px',
+                    fontWeight: 'bold',
+                    color: màu_tiền(thống_kê_phần_chục.tiền_dự_đoán.lời_lỗ),
+                    borderBottom: '1px solid currentColor',
+                  }"
+                >
+                  {{ hiện_tiền(thống_kê_phần_chục.tiền_dự_đoán.lời_lỗ) }}
+                </td>
+                <td :style="{ borderBottom: '1px solid currentColor' }"></td>
+                <td :style="{ borderBottom: '1px solid currentColor' }"></td>
+                <td :style="{ borderBottom: '1px solid currentColor' }"></td>
                 <td :style="{ borderBottom: '1px solid currentColor' }"></td>
                 <td
                   :style="{
@@ -3229,19 +3337,6 @@ onMounted(async () => {
                   }"
                 >
                   {{ hiện_tiền(thống_kê_phần_chục.tiền_chính_đài.lời_lỗ) }}
-                </td>
-                <td :style="{ borderBottom: '1px solid currentColor' }"></td>
-                <td :style="{ borderBottom: '1px solid currentColor' }"></td>
-                <td
-                  :style="{
-                    textAlign: 'right',
-                    padding: '2px 0 2px 14px',
-                    fontWeight: 'bold',
-                    color: màu_tiền(thống_kê_phần_chục.tiền_dự_đoán.lời_lỗ),
-                    borderBottom: '1px solid currentColor',
-                  }"
-                >
-                  {{ hiện_tiền(thống_kê_phần_chục.tiền_dự_đoán.lời_lỗ) }}
                 </td>
               </tr>
             </thead>
@@ -3310,6 +3405,56 @@ onMounted(async () => {
                   }"
                 >
                   {{ ngày.chưa_có ? '—' : hiện_tiền(ngày.giải_8.lời_lỗ + ngày.đặc_biệt.lời_lỗ) }}
+                </td>
+                <td :style="{ padding: '2px 14px', whiteSpace: 'nowrap', fontWeight: 'bold' }">
+                  <template v-if="ngày.dự_đoán.chi_tiết.length === 0">—</template>
+                  <template v-else>
+                    <span
+                      v-for="mục in ngày.dự_đoán.chi_tiết"
+                      :key="mục.chục"
+                      :style="{ marginRight: '8px', color: mục.trúng ? '#16a34a' : '#dc2626' }"
+                    >
+                      {{ mục.chục === 0 ? '00' : `${mục.chục}x`
+                      }}<template v-if="mục.số_lần > 1">({{ mục.số_lần }})</template
+                      ><small :style="{ fontWeight: 'normal' }">
+                        [{{ mục.số_năm_trước.join(' ') }}]</small
+                      >
+                    </span>
+                  </template>
+                </td>
+                <td :style="{ textAlign: 'right', padding: '2px 14px', whiteSpace: 'nowrap' }">
+                  <template v-if="ngày.chưa_có">—</template>
+                  <template v-else>
+                    {{ ngày.dự_đoán.trúng_đầu }}/{{ ngày.dự_đoán.số_đài }} ·
+                    {{ ngày.dự_đoán.trúng_cuối }}/{{ ngày.dự_đoán.số_đài }}
+                  </template>
+                </td>
+                <td
+                  :style="{
+                    textAlign: 'right',
+                    padding: '2px 14px',
+                    fontWeight: 'bold',
+                    color: màu_tiền(ngày.dự_đoán.lời_lỗ),
+                  }"
+                >
+                  {{
+                    ngày.dự_đoán.phần_chục.length && !ngày.chưa_có
+                      ? hiện_tiền(ngày.dự_đoán.lời_lỗ)
+                      : '—'
+                  }}
+                </td>
+                <td :style="{ padding: '2px 14px', whiteSpace: 'nowrap' }">
+                  <template v-if="ngày.chưa_có">—</template>
+                  <template v-else>
+                    <span
+                      v-for="mục in ngày.phần_chục_kết_quả"
+                      :key="mục.chục"
+                      :style="{ marginRight: '8px', fontWeight: 'bold' }"
+                    >
+                      {{ mục.chục === 0 ? '00' : `${mục.chục}x`
+                      }}<template v-if="mục.số_lần > 1">({{ mục.số_lần }})</template>
+                    </span>
+                  </template>
                 </td>
                 <td :style="{ padding: '2px 14px', whiteSpace: 'nowrap' }">
                   {{ ngày.ngày_năm_trước }}
@@ -3400,40 +3545,6 @@ onMounted(async () => {
                       }}</b>
                     </template>
                   </template>
-                </td>
-                <td :style="{ padding: '2px 14px', whiteSpace: 'nowrap', fontWeight: 'bold' }">
-                  <template v-if="ngày.dự_đoán.chi_tiết.length === 0">—</template>
-                  <template v-else>
-                    <span
-                      v-for="mục in ngày.dự_đoán.chi_tiết"
-                      :key="mục.chục"
-                      :style="{ marginRight: '8px', color: mục.trúng ? '#16a34a' : '#dc2626' }"
-                    >
-                      {{ mục.chục === 0 ? '00' : `${mục.chục}x`
-                      }}<template v-if="mục.số_lần > 1">({{ mục.số_lần }})</template>
-                    </span>
-                  </template>
-                </td>
-                <td :style="{ textAlign: 'right', padding: '2px 14px', whiteSpace: 'nowrap' }">
-                  <template v-if="ngày.chưa_có">—</template>
-                  <template v-else>
-                    {{ ngày.dự_đoán.trúng_đầu }}/{{ ngày.dự_đoán.số_đài }} ·
-                    {{ ngày.dự_đoán.trúng_cuối }}/{{ ngày.dự_đoán.số_đài }}
-                  </template>
-                </td>
-                <td
-                  :style="{
-                    textAlign: 'right',
-                    padding: '2px 0 2px 14px',
-                    fontWeight: 'bold',
-                    color: màu_tiền(ngày.dự_đoán.lời_lỗ),
-                  }"
-                >
-                  {{
-                    ngày.dự_đoán.phần_chục.length && !ngày.chưa_có
-                      ? hiện_tiền(ngày.dự_đoán.lời_lỗ)
-                      : '—'
-                  }}
                 </td>
               </tr>
             </tbody>
