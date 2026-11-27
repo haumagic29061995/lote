@@ -291,23 +291,3 @@ export function xữ_lý_dữ_liệu_xuất_hiện(
       dữ_liệu_1.tập_các_số_đã_xuất_hiện.has(num),
     ).length || 0
 }
-
-
-// tính danh sách chính của kỳ ở `vị_trí_kỳ` trong dữ liệu vừa nạp, giống cách trang chính tính;
-// dùng cho trang chỉ cần xem lại một kỳ mà không chạy lại toàn bộ
-export function tính_danh_sách_chính_của_kỳ(
-  loại_xổ_số: 45 | 55,
-  vị_trí_kỳ: number,
-): Loại_Dữ_Liệu_Xuât_Hiện[] | undefined {
-  const dữ_liệu_45 = lấy_dữ_liệu_xổ_số_45()
-  const dữ_liệu_55 = lấy_dữ_liệu_xổ_số_55()
-  // loại nào quay kế tiếp thì không cần bù trừ vị trí, loại còn lại lệch 1 kỳ
-  const loại_quay_tiếp = moment(dữ_liệu_45[0].ngày_xổ_số, 'DD/MM/YYYY') > moment(dữ_liệu_55[0].ngày_xổ_số, 'DD/MM/YYYY') ? 55 : 45
-  const bù_trừ = loại_quay_tiếp === loại_xổ_số ? 0 : -1
-  const danh_sách = loại_xổ_số === 45 ? dữ_liệu_45 : dữ_liệu_55
-  const danh_sách_khác = loại_xổ_số === 45 ? dữ_liệu_55 : dữ_liệu_45
-  const dữ_liệu = danh_sách[vị_trí_kỳ]
-  if (!dữ_liệu) return undefined
-  xữ_lý_dữ_liệu_xuất_hiện(danh_sách, dữ_liệu, danh_sách_khác[vị_trí_kỳ + bù_trừ], vị_trí_kỳ)
-  return dữ_liệu.danh_sách_nguyên_mẫu_dữ_liệu_đã_xuất_hiện
-}

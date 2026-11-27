@@ -1,6 +1,6 @@
 import type { Đối_Tượng_Xổ_Số } from '@/types/lote'
 
-// Dùng database riêng, không đụng đến 'DữLiệuLặpLại' của indexeddb-service
+// Cache danh sách dự đoán trong IndexedDB
 const TÊN_CƠ_SỞ_DỮ_LIỆU = 'BộNhớĐệmDựĐoán'
 const TÊN_KHO_DỮ_LIỆU = 'bộ_nhớ_đệm'
 
@@ -13,33 +13,6 @@ export type Dự_Đoán_Đã_Lưu = {
   số_lần_xuất_hiện_ds: number[][][]
   vị_trí_ds_xuất_hiện: number[][][]
 }
-
-// Vé tạo từ danh sách xuất hiện của kỳ mới nhất (công thức cố định), lưu để đối chiếu sau
-export const TIỀN_TỐ_VÉ_TỪ_DANH_SÁCH = 'vé_từ_danh_sách|'
-
-export type Vé_Từ_Danh_Sách_Đã_Lưu = {
-  loại_xổ_số: number
-  ngày_cơ_sở: string // ngày kỳ mới nhất trong dữ liệu lúc tạo (DD/MM/YYYY)
-  ngày_dự_đoán: string // ngày kỳ tiếp theo mà bộ vé dành cho (DD/MM/YYYY)
-  thời_điểm_tạo: number
-  chỉ_số_danh_sách: number
-  vé: string[][]
-}
-
-// Vé của nút "tạo dự đoán" (danh sách chính và các danh sách phụ), lưu để đánh giá khi có kết quả kỳ sau
-export const TIỀN_TỐ_DỰ_ĐOÁN_THEO_SỐ_LẦN = 'dự_đoán_theo_số_lần|'
-
-export type Dự_Đoán_Theo_Số_Lần_Đã_Lưu = {
-  loại_xổ_số: number
-  ngày_cơ_sở: string // ngày kỳ mới nhất trong dữ liệu lúc tạo (DD/MM/YYYY)
-  ngày_dự_đoán: string // ngày kỳ tiếp theo mà các vé dành cho (DD/MM/YYYY)
-  thời_điểm_tạo: number
-  điều_kiện: string // mô tả số lần, lọc... lúc tạo
-  các_danh_sách: Array<{ tên: string; vé: string[][] }> // chỉ gồm danh sách tạo được vé
-}
-
-// Vé của nút "phân tích và dự đoán" (từ thống kê dự đoán), cùng dạng bản ghi với "tạo dự đoán" nhưng lưu riêng
-export const TIỀN_TỐ_PHÂN_TÍCH_DỰ_ĐOÁN = 'phân_tích_dự_đoán|'
 
 function mở_cơ_sở_dữ_liệu(): Promise<IDBDatabase> {
   return new Promise((giải_quyết, từ_chối) => {
@@ -73,35 +46,6 @@ export async function đọc_bộ_nhớ_đệm<T>(khóa: string): Promise<T | un
   }
 }
 
-// Lấy mọi bản ghi có khóa bắt đầu bằng `tiền_tố`
-export async function liệt_kê_bộ_nhớ_đệm_theo_tiền_tố<T>(
-  tiền_tố: string,
-): Promise<Array<{ khóa: string; giá_trị: T }>> {
-  try {
-    const cơ_sở = await mở_cơ_sở_dữ_liệu()
-    try {
-      return await new Promise<Array<{ khóa: string; giá_trị: T }>>((giải_quyết, từ_chối) => {
-        const kho = cơ_sở.transaction(TÊN_KHO_DỮ_LIỆU, 'readonly').objectStore(TÊN_KHO_DỮ_LIỆU)
-        const phạm_vi = IDBKeyRange.bound(tiền_tố, tiền_tố + '\uffff')
-        const kết_quả: Array<{ khóa: string; giá_trị: T }> = []
-        const yêu_cầu = kho.openCursor(phạm_vi)
-        yêu_cầu.onerror = () => từ_chối(yêu_cầu.error)
-        yêu_cầu.onsuccess = () => {
-          const con_trỏ = yêu_cầu.result
-          if (!con_trỏ) return giải_quyết(kết_quả)
-          kết_quả.push({ khóa: String(con_trỏ.key), giá_trị: con_trỏ.value })
-          con_trỏ.continue()
-        }
-      })
-    } finally {
-      cơ_sở.close()
-    }
-  } catch (lỗi) {
-    console.warn('Không đọc được bộ nhớ đệm:', lỗi)
-    return []
-  }
-}
-
 export async function ghi_bộ_nhớ_đệm<T>(khóa: string, giá_trị: T): Promise<void> {
   try {
     const cơ_sở = await mở_cơ_sở_dữ_liệu()
@@ -118,28 +62,6 @@ export async function ghi_bộ_nhớ_đệm<T>(khóa: string, giá_trị: T): Pr
     }
   } catch (lỗi) {
     console.warn('Không ghi được bộ nhớ đệm:', lỗi)
-  }
-}
-
-// Xoá toàn bộ bản ghi trong kho (cả danh sách dự đoán lẫn các bộ vé đã lưu), trả về false nếu lỗi
-export async function xóa_toàn_bộ_bộ_nhớ_đệm(): Promise<boolean> {
-  try {
-    const cơ_sở = await mở_cơ_sở_dữ_liệu()
-    try {
-      await new Promise<void>((giải_quyết, từ_chối) => {
-        const giao_dịch = cơ_sở.transaction(TÊN_KHO_DỮ_LIỆU, 'readwrite')
-        giao_dịch.objectStore(TÊN_KHO_DỮ_LIỆU).clear()
-        giao_dịch.oncomplete = () => giải_quyết()
-        giao_dịch.onerror = () => từ_chối(giao_dịch.error)
-        giao_dịch.onabort = () => từ_chối(giao_dịch.error)
-      })
-      return true
-    } finally {
-      cơ_sở.close()
-    }
-  } catch (lỗi) {
-    console.warn('Không xoá được bộ nhớ đệm:', lỗi)
-    return false
   }
 }
 
